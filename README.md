@@ -27,7 +27,7 @@ smsrelay 是一个纯 Magisk 模块。可以任选企业微信机器人、SMTP �
 | 企业微信群 | 开启 `wecom.enabled`，填入 `wecom.webhook` |
 | 邮箱 | 开启 `smtp.enabled`，填写 `host`、`port`、`tls`、`username`、`password`、`from` 和收件人列表 `to` |
 
-[默认配置](module/config/config.json)和[企业微信、SMTP 配置示例](docs/USAGE.md#渠道设置)可以直接对照填写。三个筛选列表均为空时，会转发所有新收件短信。
+[带中文注释的配置模板](module/config/config.json)和[渠道示例](docs/USAGE.md#渠道设置)可以直接对照填写。文件保留 `config.json` 名称，支持 `//` 注释。三个筛选列表均为空时，会转发所有新收件短信。
 
 ## 日常使用
 

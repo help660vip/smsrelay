@@ -1,1 +1,67 @@
-{"schema_version":1,"enabled":false,"filters":{"sim_slots":[],"numbers":[],"keywords":[]},"wecom":{"enabled":false,"webhook":"https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=REPLACE-ME"},"smtp":{"enabled":false,"host":"smtp.example.invalid","port":465,"tls":"implicit","username":"sender@example.invalid","password":"REPLACE-ME","from":"sender@example.invalid","to":["recipient@example.invalid"]},"retry_seconds":[30,120,600],"timeouts":{"connect_seconds":10,"io_seconds":15,"total_seconds":45},"logging":{"level":"INFO","timezone":"Asia/Shanghai","days":7,"max_bytes":2097152,"trim_bytes":1048576},"retention":{"dedup_days":30,"max_messages":20000,"completed_body_hours":24}}
+{
+  // smsrelay 配置文件。保留文件名 config.json，使用 UTF-8 保存。
+  // 可以保留 // 注释。字段名和字符串要用双引号，最后一项不要加逗号。
+  // 改完后在 Magisk「操作」里选「检查并重载配置」。
+  "schema_version": 1,
+
+  // 总开关。配置好至少一个渠道后，将 false 改成 true。
+  "enabled": false,
+
+  // 短信筛选。每组命中任意一项即可，启用多组时需同时满足。
+  // 空列表 [] 表示不限该项。三组留空会转发所有新收件短信。
+  "filters": {
+    "sim_slots": [], // 手机卡槽编号，例如 [1, 2]。
+    "numbers": [],  // 精确匹配发件人，例如 ["10086"]。
+    "keywords": []  // 正文包含任一关键词，例如 ["账单", "余额"]。
+  },
+
+  // 企业微信群机器人。复制机器人提供的完整 Webhook 地址。
+  "wecom": {
+    "enabled": false, // 使用企业微信时改为 true。
+    "webhook": "https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=REPLACE-ME"
+  },
+
+  // SMTP 邮箱。按邮箱服务商提供的设置填写。
+  "smtp": {
+    "enabled": false, // 使用邮箱时改为 true。
+    "host": "smtp.example.invalid",
+    "port": 465,
+    "tls": "implicit", // 465 通常用 implicit，587 通常用 starttls。
+    "username": "sender@example.invalid",
+    "password": "REPLACE-ME", // SMTP 密码或授权码，请勿公开本文件。
+    "from": "sender@example.invalid",
+    "to": [
+      "recipient@example.invalid" // 可用逗号再加一个收件地址。
+    ]
+  },
+
+  // 各次重试前等待的秒数。留空 [] 表示失败后不自动重试。
+  "retry_seconds": [
+    30,
+    120,
+    600
+  ],
+
+  // SMTP 和企业微信的超时，单位为秒。
+  "timeouts": {
+    "connect_seconds": 10, // 建立连接的时限。
+    "io_seconds": 15,      // 读写时限。
+    "total_seconds": 45    // 单次发送的总时限。
+  },
+
+  // 日志按选定时区计算保留天数。大小单位为字节。
+  "logging": {
+    "level": "INFO", // 可选 DEBUG、INFO、WARN、ERROR。
+    "timezone": "Asia/Shanghai",
+    "days": 7,
+    "max_bytes": 2097152, // 日志达到 2 MiB 时裁剪。
+    "trim_bytes": 1048576 // 裁剪后保留约 1 MiB，需小于 max_bytes。
+  },
+
+  // 手机本地队列和去重记录的保留设置。
+  "retention": {
+    "dedup_days": 30,           // 去重记录保留天数。
+    "max_messages": 20000,      // 消息记录数上限，达到后需处理积压。
+    "completed_body_hours": 24 // 所有目标发送成功后，正文的保留小时数。
+  }
+}

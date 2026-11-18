@@ -12,6 +12,7 @@ public final class Config {
   public final int connect, io, total;
 
   public Config(String text) throws Exception {
+    // Android 的 JSONTokener 支持带注释的配置。注释不会进入生效配置或任务快照。
     raw = new JSONObject(text);
     if (raw.getInt("schema_version") != 1) throw new IllegalArgumentException("schema_version");
     enabled = raw.getBoolean("enabled");
