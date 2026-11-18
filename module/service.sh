@@ -4,7 +4,7 @@ umask 077
 if [ -f "$MODDIR/disable" ] || [ -f "$MODDIR/remove" ]; then exit 0; fi
 mkdir -p /data/adb/smsrelay/run
 chmod 700 /data/adb/smsrelay /data/adb/smsrelay/run
-# Bounded boot readiness wait, never a resident watchdog.
+# 仅在开机时等待系统就绪，最长约三分钟。
 n=0
 while [ "$(getprop sys.boot_completed)" != 1 ] && [ "$n" -lt 90 ]; do
   sleep 2

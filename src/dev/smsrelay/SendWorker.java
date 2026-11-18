@@ -9,7 +9,7 @@ import javax.mail.*;
 import javax.mail.internet.*;
 import org.json.*;
 
-/** Short lived process; parent kills the whole network worker at the hard deadline. */
+/** 每个发送任务使用独立的短时进程，由父进程强制执行总超时。 */
 public final class SendWorker {
   public static void run() {
     JSONObject result = new JSONObject();
@@ -111,6 +111,7 @@ public final class SendWorker {
         }
       }
       JSONObject response = new JSONObject(bytes.toString("UTF-8"));
+      // HTTP 成功只代表服务器收到了请求，还需检查机器人返回的业务状态。
       int code = response.getInt("errcode");
       if (code != 0) throw new Rejected(code != 45009 && code != -1 && code != 45011, code);
     } finally {

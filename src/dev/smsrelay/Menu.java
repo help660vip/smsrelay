@@ -67,7 +67,7 @@ public final class Menu {
     java.util.concurrent.atomic.AtomicInteger open =
         new java.util.concurrent.atomic.AtomicInteger(devices.size());
     for (String path : devices) {
-      // AOSP getevent accepts one device path, so own one reader per key device.
+      // getevent 每次只接收一个设备路径。音量键可能分属多个设备，因此分别监听。
       Process input = new ProcessBuilder("/system/bin/getevent", "-ql", path).start();
       inputs.add(input);
       Thread reader =

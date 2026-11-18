@@ -176,7 +176,7 @@ public final class Main {
             "crash_limit_reached:3/10min; manual restart required");
         break;
       }
-      Thread.sleep(failures * 2000L); // Only after an actual child exit, never a heartbeat.
+      Thread.sleep(failures * 2000L); // 子进程异常退出后才按失败次数稍等再重启。
     }
   }
 

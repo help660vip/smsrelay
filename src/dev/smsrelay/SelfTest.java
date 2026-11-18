@@ -6,7 +6,7 @@ import java.io.*;
 import java.util.*;
 import org.json.*;
 
-/** No real Provider, SIM, clock, network, or user data touched. */
+/** 使用隔离数据验证采集和队列逻辑，无需读取真实短信或连接网络。 */
 public final class SelfTest {
   static int checks;
 

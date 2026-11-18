@@ -6,7 +6,7 @@ import android.net.Uri;
 import android.os.*;
 import java.lang.reflect.*;
 
-/** Uses the device's own generated Binder interfaces; no transaction numbers. */
+/** 使用系统框架生成的 Binder 接口，避免依赖固定的事务编号。 */
 public final class PlatformBridge {
   public final int api = Build.VERSION.SDK_INT;
   private final Object am, provider;
@@ -98,9 +98,8 @@ public final class PlatformBridge {
   }
 
   public void observe(ContentObserver observer) throws Exception {
-    // Provider-owned cursor notification bridge: provider registers its own
-    // SelfContentObserver with ContentService, then framework BulkCursor Binder
-    // forwards changes to this root process. No fabricated APK/PID identity.
+    // 由短信 Provider 为远程 Cursor 注册观察器，通过 Binder 将变更送到 root 进程。
+    // 保留空结果的 Cursor 就能持续收通知，读取正文由后续采集负责。
     signalCursor = query(new String[] {"_id"}, "_id = -1", null, null);
     if (signalCursor == null)
       throw new IllegalStateException("Provider cursor has no notification URI");

@@ -15,6 +15,7 @@ public final class StateDb implements Closeable {
     public int sub, slot;
     public String address, body, number = "未知", carrier = "未知";
 
+    // 短信库恢复后记录 ID 可能变化，去重指纹用发件人、时间、订阅和正文计算。
     public String fingerprint() {
       return Rules.hash(address + "\u0000" + date + "\u0000" + sub + "\u0000" + body);
     }
@@ -78,6 +79,7 @@ public final class StateDb implements Closeable {
             + " DEFAULT 0,next INTEGER NOT NULL DEFAULT 0,error"
             + " TEXT,UNIQUE(message,channel,target,part))");
     db.execSQL("CREATE INDEX IF NOT EXISTS task_due ON tasks(state,next)");
+    // 进程退出时服务端可能已经收到消息。重启补发可恢复队列，但这类任务可能重复送达。
     db.execSQL(
         "UPDATE tasks SET state='PENDING',error='recovered ambiguous send' WHERE state='SENDING'");
     android.system.Os.chmod(f.getPath(), 0600);
@@ -132,6 +134,7 @@ public final class StateDb implements Closeable {
     String text = s.text();
     JSONObject messageConfig =
         new JSONObject(cfg.raw.toString()).put("message_subject", s.subject());
+    // 按渠道、目标和分段记录任务，某个目标失败时可以独立补发。
     if (cfg.wecom.getBoolean("enabled")) {
       List<String> segments = Rules.split(text, 1900);
       String target = Rules.hash(cfg.wecom.getString("webhook"));
@@ -189,6 +192,7 @@ public final class StateDb implements Closeable {
     db.insertOrThrow("tasks", null, v);
   }
 
+  // 同一消息发往同一目标时，前面的分段全部成功后才能发送后续分段。
   public Task due(long now) {
     String sql =
         "SELECT t.id,t.message,t.channel,t.part,t.parts,t.payload,t.settings,t.attempt,t.next FROM"
@@ -269,6 +273,7 @@ public final class StateDb implements Closeable {
     return (int) pending();
   }
 
+  // 手动重试可用新凭据修复旧任务，但发送目标必须与入队时一致。
   public int retry(Config cfg) throws Exception {
     begin();
     try {

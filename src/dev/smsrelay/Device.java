@@ -8,7 +8,7 @@ import android.telephony.*;
 import java.lang.reflect.*;
 import java.util.*;
 
-/** Root identity for managers, never a Context belonging to an installed APK. */
+/** 使用 root 身份访问系统服务，模块无需依附已安装应用的 Context。 */
 public final class Device {
   public final Context context;
   public final ConnectivityManager network;

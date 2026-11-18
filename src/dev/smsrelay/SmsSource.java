@@ -98,6 +98,7 @@ public final class SmsSource implements AutoCloseable {
             requestScan();
           }
         };
+    // 先注册观察器再补查收件箱，补查期间的变化仍可触发下一次采集。
     bridge.observe(observer);
     registered = true;
     bridge.death(
@@ -169,7 +170,7 @@ public final class SmsSource implements AutoCloseable {
     try (Cursor top = bridge.query(new String[] {"_id"}, null, null, "_id DESC LIMIT 1")) {
       if (top != null && top.moveToFirst()) snapshot = top.getLong(0);
     }
-    // Finite overlap catches changed IDs/rebuilt databases; no timer runs this query.
+    // 增量查询与最近记录适当重叠，以找回数据库重建或 ID 回退后的记录。重复项由指纹去重。
     List<StateDb.Sms> rows =
         first
             ? read("date >= ?", new String[] {"" + (now - 172800000)}, "_id ASC")
@@ -182,6 +183,7 @@ public final class SmsSource implements AutoCloseable {
     int added = 0;
     db.begin();
     try {
+      // 首次只跳过快照中的旧短信。入队和采集进度放在同一事务中，失败后一并回滚。
       for (StateDb.Sms s : rows) if (db.add(s, cfg, first && s.providerId <= snapshot)) added++;
       db.put("initialized", "true");
       db.put("max_id", "" + max);

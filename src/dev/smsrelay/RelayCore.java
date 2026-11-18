@@ -97,6 +97,7 @@ public final class RelayCore implements AutoCloseable {
     StateDb.Task startedTask = null;
     try {
       boolean pending = db.pending() > 0;
+      // 只有可发送的待办才需要监听网络状态，断网时等系统回调再继续。
       watch(pending && cfg.enabled);
       if (!pending || !cfg.enabled || busy) return;
       if (!online()) return;
@@ -123,6 +124,7 @@ public final class RelayCore implements AutoCloseable {
       startedTask = task;
       sends++;
       wake = device.wake(snapshot.total * 1000L + 5000);
+      // 将网络请求放在子进程里，达到总超时时可以终止它。
       final Process sender = Main.process("send-worker", home);
       child = sender;
       final long start = SystemClock.elapsedRealtime();
@@ -195,6 +197,7 @@ public final class RelayCore implements AutoCloseable {
 
   private void finish(
       StateDb.Task t, long start, boolean[] done, boolean success, boolean permanent, String code) {
+    // 超时与子进程结果都回到同一个 Handler，先到的回调负责结算。
     if (done[0] || closed) return;
     done[0] = true;
     child = null;

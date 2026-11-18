@@ -6,7 +6,7 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import org.json.*;
 
-/** Only the daemon event thread writes or maintains this file. */
+/** 仅由守护进程的事件线程写入和维护日志。 */
 public final class Logger implements Closeable {
   public interface Clock {
     long wall();
@@ -117,7 +117,7 @@ public final class Logger implements Closeable {
   }
 
   public void error(String code, Exception error) {
-    // Never log exception messages: HTTP/SMTP exceptions may contain credentials or recipients.
+    // HTTP 和 SMTP 的异常原文可能含凭据或收件地址，只记录异常类型。
     String key = code + ":" + error.getClass().getSimpleName();
     long now = clock.mono();
     long[] entry = repeated.get(key);
