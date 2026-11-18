@@ -3,4 +3,4 @@ name=smsrelay
 version=0.1.0
 versionCode=1
 author=help660vip
-description=事件驱动 root 短信转发；企业微信 / SMTP；无 APK。配置 /data/adb/smsrelay/config.json，默认关闭。
+description=收到新短信后自动转发到企业微信机器人或 SMTP 邮箱，两个渠道可同时开启。支持按卡槽、发件人和关键词筛选，断网暂存，失败重试。首次启用跳过历史短信。点「操作」可查看状态、测试消息和重载配置。
