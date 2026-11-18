@@ -1,0 +1,4 @@
+#!/system/bin/sh
+MODDIR=${0%/*}
+export CLASSPATH="$MODDIR/smsrelay.jar"
+exec /system/bin/app_process /system/bin --nice-name=smsrelay-control dev.smsrelay.Main ctl /data/adb/smsrelay "${1:-status}"

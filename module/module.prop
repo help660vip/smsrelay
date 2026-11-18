@@ -1,0 +1,6 @@
+id=smsrelay
+name=smsrelay
+version=0.1.0
+versionCode=1
+author=help660vip
+description=事件驱动 root 短信转发；企业微信 / SMTP；无 APK。配置 /data/adb/smsrelay/config.json，默认关闭。

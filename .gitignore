@@ -1,0 +1,8 @@
+/private/
+/tools/
+/build/
+/dist/
+*.local.json
+*.log
+*.db
+*.db-*

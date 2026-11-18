@@ -1,0 +1,27 @@
+[
+  {
+    "name": "jdk.zip",
+    "sha256": "98518ecf554465057ee5509462631deeee374bc368c12a411d225cd29381f84b",
+    "url": "https://github.com/adoptium/temurin17-binaries/releases/download/jdk-17.0.21%2B9/OpenJDK17U-jdk_x64_windows_hotspot_17.0.21_9.zip"
+  },
+  {
+    "name": "platform.zip",
+    "sha256": "b32b10f787867987f03ae8e101d217e053a9065b7136379fb353b388379aed1d",
+    "url": "https://dl.google.com/android/repository/platform-33-ext3_r03.zip"
+  },
+  {
+    "name": "r8.jar",
+    "sha256": "59753e70a74f918389cc87f1b7d66b5c0862932559167425708ded159e3de439",
+    "url": "https://dl.google.com/dl/android/maven2/com/android/tools/r8/8.3.37/r8-8.3.37.jar"
+  },
+  {
+    "name": "android-mail.jar",
+    "sha256": "12c4240aa3a4ccda37c49b4e6b880a797a21e03a4f8c7421a1b51e0db552b79c",
+    "url": "https://repo.maven.apache.org/maven2/com/sun/mail/android-mail/1.6.7/android-mail-1.6.7.jar"
+  },
+  {
+    "name": "android-activation.jar",
+    "sha256": "285713b2b549f382f26a57919ecddc4c83d9755737969fb7c006c905322bb253",
+    "url": "https://repo.maven.apache.org/maven2/com/sun/mail/android-activation/1.6.7/android-activation-1.6.7.jar"
+  }
+]

@@ -1,0 +1,24 @@
+name: Build and offline checks
+on: [push, pull_request, workflow_dispatch]
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Prepare verified tools
+        shell: pwsh
+        run: ./scripts/prepare-tools.ps1 -Tools "$env:RUNNER_TEMP/smsrelay-tools"
+      - name: Offline host tests
+        shell: pwsh
+        run: ./scripts/test-host.ps1 -Tools "$env:RUNNER_TEMP/smsrelay-tools"
+      - name: Build module
+        shell: pwsh
+        run: ./scripts/build.ps1 -Tools "$env:RUNNER_TEMP/smsrelay-tools"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: smsrelay-module
+          path: dist/*
+          if-no-files-found: error
+# No private config, device serial, SMS API, webhook, or SMTP calls in CI.
