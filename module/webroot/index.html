@@ -94,7 +94,7 @@ const errors={service_offline:"后台服务未运行",bad_request:"无法读取�
   retry_unavailable:"这条任务已过期、已处理，或原目标已停用",test_rate_limit:"测试发送至少相隔 15 秒",record_missing:"记录已过保留期限"};
 const view=$("#view");
 let page="overview", status=null, settings=null, apps=null, bridge,
-  busy=false, draft=null, filters={kind:"",state:"",channel:"",search:"",from:0}, before=null;
+  busy=false, queuedPage=null, draft=null, filters={kind:"",state:"",channel:"",search:"",from:0}, before=null;
 const text=(v)=>v==null?"":String(v);
 function esc(v){return text(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
 const tr=v=>terms[v] || v || "—";
@@ -114,8 +114,25 @@ function asyncExec(cmd) {
     try {window.ksu.exec(cmd,"{}",id);} catch(e){clearTimeout(timer);delete window[id];reject(e);}
   });
 }
+function spawnExec(cmd){
+  return new Promise((resolve,reject)=>{
+    const id="smsrelayProcess"+Math.random().toString(36).slice(2), lines=[];
+    const finish=(error)=>{clearTimeout(timer);delete window[id];error?reject(error):resolve(lines.join("\n"));};
+    const timer=setTimeout(()=>finish(new Error("操作超时，可刷新状态确认结果")),42000);
+    window[id]={
+      stdout:{emit:(event,line)=>{if(event==="data")lines.push(line);}},
+      stderr:{emit:()=>{}},
+      emit:(event,code)=>{
+        if(event==="exit")finish(Number(code)===0?null:new Error("模块命令未成功"));
+        else if(event==="error")finish(new Error("模块命令未成功"));
+      }
+    };
+    try{window.ksu.spawn(cmd,"[]","{}",id);}catch(e){finish(e);}
+  });
+}
 function connector(){
   if (!window.ksu || typeof window.ksu.exec!=="function") throw new Error("请从 KsuWebUI 打开 smsrelay。");
+  if(typeof window.ksu.spawn==="function")return spawnExec;
   try {
     const out=window.ksu.exec("printf smsrelay_bridge");
     if(typeof out==="string" && out.trim()==="smsrelay_bridge") return cmd=>Promise.resolve(window.ksu.exec(cmd));
@@ -202,7 +219,7 @@ function renderApps(){
   const filter=$("#app-search").value.trim().toLowerCase();
   const matched=apps.filter(a=>(filter||!a.system||selected.includes(a.pkg))&&
     (a.label+" "+a.pkg).toLowerCase().includes(filter)).slice(0,80);
-  box.innerHTML='<p class="hint">已选 '+selected.length+' 个应用'+(matched.length===80?' · 显示前 80 项，继续搜索可缩小范围':'')+'</p>'
+  box.innerHTML='<p class="hint">已选 <span id="app-count">'+selected.length+'</span> 个应用'+(matched.length===80?' · 显示前 80 项，继续搜索可缩小范围':'')+'</p>'
     +matched.map(a=>'<label class="line"><input type="checkbox" data-app="'+esc(a.pkg)+'" '+(selected.includes(a.pkg)?"checked":"")+'>'
       +'<span class="app-icon">'+esc(a.label.slice(0,1))+'</span><span class="app-name"><strong>'+esc(a.label)+'</strong><small>'+esc(a.pkg)+'</small></span></label>').join("");
   $("#app-packages").innerHTML=apps.map(a=>'<option value="'+esc(a.pkg)+'">'+esc(a.label)+'</option>').join("");
@@ -242,7 +259,7 @@ async function save(changes){
     reply=await call({...payload,confirm_hold:true});
   }
   settings=reply;
-  status=await call({op:"status"});
+  status=reply.status;
   renderHeader();
   if(page==="rules")renderRules();else overview();
   showMsg(reply.held?"配置已生效。暂停的待发任务："+reply.held:"配置已生效。");
@@ -274,6 +291,8 @@ async function showDetail(id){
   const r=await call({op:"detail",id});
   $("#detail-content").innerHTML='<div class="section-head"><h2 id="detail-title">'+esc(r.title||names[r.kind])+'</h2>'+btn("关闭","close-detail")+'</div>'
     +'<p class="hint">'+esc(r.source)+' · '+esc(when(r.occurred))+(r.category?' · '+esc(r.category):'')+'</p>'
+    +(r.kind==="sms"&&r.receiver?'<p class="hint">接收卡　'+esc((r.receiver.slot>0?"卡"+r.receiver.slot:"未知")+" · "+r.receiver.carrier)
+      +'<br>本机号码　'+esc(r.receiver.number)+'</p>':"")
     +'<div class="article">'+esc(r.body||(r.kind==="call"?"响铃事件":"系统未提供正文"))+'</div>'
     +'<div class="toolbar spaced">'+btn("分享脱敏记录","share-"+id)+'</div><h3 class="spaced">时间线</h3><ol class="timeline">'+r.steps.map(x=>'<li><strong>'+esc(tr(x.state))+'</strong>　'+esc(names[x.channel]||"")
     +' <small>'+esc(when(x.at))+(x.attempt?' · 次数 '+x.attempt:"")+(x.reason?' · '+esc(tr(x.reason)):"")+'</small></li>').join("")
@@ -305,8 +324,8 @@ async function changePage(target){
   if(page==="logs")await renderLogs();
 }
 async function load(){
-  status=await call({op:"status"});
-  settings=await call({op:"settings"});
+  const dashboard=await call({op:"dashboard"});
+  status=dashboard.status;settings=dashboard.settings;
   renderHeader();
   if(page==="overview")overview();
   if(page==="rules")renderRules();
@@ -340,20 +359,29 @@ async function action(a){
     if(a==="test"&&!confirm("测试会向当前规则选择的渠道发送一条模拟消息。继续？"))return;
     const r=await call({...sample,confirmed:a==="test"});
     const out=$("#preview-result");out.hidden=false;
-    out.textContent=(r.id?"已入队，记录 #"+r.id:tr(r.decision))+(r.channels.length?" · "+r.channels.map(k=>names[k]).join("、"):"")
+    out.textContent=(r.id?"已入队，记录 #"+r.id:r.decision==="queued"?"符合规则 · 仅预览":tr(r.decision))+(r.channels.length?" · "+r.channels.map(k=>names[k]).join("、"):"")
       +"\n\n"+r.title+"\n"+r.body;
   }
 }
 async function guard(work){
   if(busy)return;busy=true;
-  try{showMsg("");await work();}
+  view.setAttribute("aria-busy","true");
+  try{showMsg("处理中…");await work();}
   catch(e){showMsg(e.message||"操作未完成。",true);if(!status&&page==="overview")overview();}
-  finally{busy=false;}
+  finally{
+    busy=false;view.setAttribute("aria-busy","false");
+    if($("#banner").textContent==="处理中…")showMsg("");
+    if(queuedPage){const next=queuedPage;queuedPage=null;guard(()=>changePage(next));}
+  }
 }
 document.addEventListener("click",e=>{
   const el=e.target.closest("button");if(!el)return;
   if(el.id==="refresh"){guard(()=>action("refresh"));return;}
-  if(el.dataset.page){guard(()=>changePage(el.dataset.page));return;}
+  if(el.dataset.page){
+    if(busy)queuedPage=el.dataset.page;
+    else guard(()=>changePage(el.dataset.page));
+    return;
+  }
   if(el.dataset.action)guard(()=>action(el.dataset.action));
 });
 document.addEventListener("change",e=>{
@@ -361,6 +389,7 @@ document.addEventListener("change",e=>{
   const set=new Set(draft.routing.notification.apps||[]);
   if(e.target.checked)set.add(pkg);else set.delete(pkg);
   draft.routing.notification.apps=Array.from(set);
+  const count=$("#app-count");if(count)count.textContent=String(set.size);
 });
 overview();guard(load);
 }());

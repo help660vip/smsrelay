@@ -31,7 +31,7 @@ smsrelay 是一个纯 Magisk 模块。可以任选企业微信机器人、SMTP �
 
 ## WebUI 与更多转发类型
 
-v0.2.0 开发版新增响铃提醒和应用通知。短信、来电和应用通知可以分别开关，并各选企业微信、邮箱或两个渠道。在 Magisk 手机上，用 KsuWebUIStandalone 打开 `smsrelay`，可以选应用、预览规则、检查监听和查看收发记录。有了 WebUI 仍可继续用 Magisk「操作」菜单。[新版上手与兼容限制](docs/WEBUI.md)
+v0.2.x 开发版新增响铃提醒和应用通知。短信、来电和应用通知可以分别开关，并各选企业微信、邮箱或两个渠道。在 Magisk 手机上，用 KsuWebUIStandalone 打开 `smsrelay`，可以选应用、预览规则、检查监听和查看收发记录。有了 WebUI 仍可继续用 Magisk「操作」菜单。[新版上手与兼容限制](docs/WEBUI.md)
 
 ## 日常使用
 

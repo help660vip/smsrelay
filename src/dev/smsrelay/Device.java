@@ -149,7 +149,7 @@ public final class Device {
               if (n != null && !n.isEmpty()) number = n;
             } catch (Exception ignored) {
             }
-          if (number != null && !number.trim().isEmpty()) s.number = number;
+          if (number != null && !number.trim().isEmpty()) s.number = number.trim();
           next.put(s.id, s);
         }
       sims.clear();
@@ -172,6 +172,11 @@ public final class Device {
     u.id = id;
     u.slot = 0;
     return u;
+  }
+
+  Sim simAtSlot(int slot) {
+    if (slot > 0) for (Sim sim : sims.values()) if (sim.slot == slot) return sim;
+    return sim(-1);
   }
 
   public void watchSims(Runnable changed) throws Exception {

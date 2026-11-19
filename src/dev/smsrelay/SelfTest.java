@@ -351,21 +351,33 @@ public final class SelfTest {
           app.body,"com.example.other","message",now,0,false);
       Routing.Event loop = new Routing.Event("notification","noticeY","合成应用","系统消息",
           db.marker+"\n已转发过的内容",app.pkg,app.category,now,0,false);
-      Routing.Event call = new Routing.Event("call","call1","未知号码","来电测试",
-          "","", "",now,2,false);
+      Routing.Event call = new Routing.Event("call","call1","+12025550148","来电测试",
+          "","", "",now,2,false,"+12025550149","合成运营商");
       check(Routing.effect(cfg,other,db.marker).equals("app_not_selected"),"unselected application is rejected");
       check(Routing.effect(cfg,loop,db.marker).equals("loop_prevented"),"same relay marker blocks either channel");
-      long id;
+      long id, callId;
       db.begin();
       try {
         id=db.addEvent(app,cfg,true,null);
         db.addEvent(second,cfg,true,null);
         db.addEvent(loop,cfg,true,null);
-        db.addEvent(call,cfg,true,null);
+        callId=db.addEvent(call,cfg,true,null);
         db.commit();
       } finally { db.end(); }
       check(db.pending()==5,"equal text with different event IDs is not discarded");
-      check(db.due(now,db.allowed(cfg)).kind.equals("call"),"ring alert precedes ordinary notices");
+      StateDb.Task ring = db.due(now,db.allowed(cfg));
+      check(ring.kind.equals("call"),"ring alert precedes ordinary notices");
+      JSONObject callHistory=db.history.detail(callId,db.allowed(cfg));
+      check(ring.payload.contains("来电号码：+12025550148")
+          && ring.payload.contains("本机号码：+12025550149")
+          && callHistory.getJSONObject("receiver").getInt("slot")==2
+          && callHistory.getJSONObject("receiver").getString("number").equals("+12025550149"),
+          "ring payload and history distinguish caller and receiving SIM number");
+      StateDb.Sms sms=new StateDb.Sms();
+      sms.date=now;sms.slot=1;sms.number="+12025550147";sms.carrier="合成运营商";sms.address="TEST";
+      sms.body="合成正文";
+      check(Routing.Event.sms(sms).message().contains("本机号码：+12025550147"),
+          "SMS formatter identifies its receiving SIM number");
       db.expire(now+600001);
       check(db.pending()==4,"stale ring alert expires without sending");
       JSONObject entry=db.history.detail(id,db.allowed(cfg));

@@ -21,11 +21,13 @@ final class EventSources implements AutoCloseable {
   final Device device;
   final Sink sink;
   private final List<CallListener> calls = new ArrayList<>();
-  private Object registry;
+  private Object registry, numberRegistry;
+  private int[] numberEvents;
+  private java.lang.reflect.Field numberCallback;
   private int callGeneration;
   private NotificationListenerService notifications;
   String callState = "disabled";
-  Exception callError;
+  Exception callError, callerIdError;
   String notificationState = "disabled";
 
   EventSources(Device device, Sink sink) {
@@ -46,6 +48,7 @@ final class EventSources implements AutoCloseable {
   void refreshCalls() {
     closeCalls();
     callError = null;
+    callerIdError = null;
     try {
       if (Build.VERSION.SDK_INT >= 31) {
         registry = Class.forName("android.telephony.TelephonyRegistryManager")
@@ -67,12 +70,35 @@ final class EventSources implements AutoCloseable {
       int generation = callGeneration;
       new android.os.Handler(device.context.getMainLooper()).postDelayed(() -> {
         if (generation == callGeneration && callState.equals("connecting"))
-          callState = "unavailable:callback_timeout";
+          tryStateOnlyAfterTimeout(generation);
       },5000);
     } catch (Exception | LinkageError e) {
       if (e instanceof Exception) callError = (Exception)e;
       closeCalls();
       callState = "unavailable:" + e.getClass().getSimpleName();
+    }
+  }
+
+  private void tryStateOnlyAfterTimeout(int generation) {
+    callState = "unavailable:callback_timeout";
+    boolean fallingBack = false;
+    for (CallListener listener : calls) {
+      if (listener.initialized || !listener.legacy) continue;
+      try {
+        listenWithNumber(listener,PhoneStateListener.LISTEN_NONE);
+        listener.legacy = false;
+        listenStateOnly(listener);
+        fallingBack = true;
+      } catch (Exception e) {
+        callerIdError = e;
+      }
+    }
+    if (fallingBack) {
+      callState = "connecting";
+      new android.os.Handler(device.context.getMainLooper()).postDelayed(() -> {
+        if (generation == callGeneration && callState.equals("connecting"))
+          callState = "unavailable:callback_timeout";
+      },5000);
     }
   }
 
@@ -82,16 +108,61 @@ final class EventSources implements AutoCloseable {
       return;
     }
     if (flags == PhoneStateListener.LISTEN_NONE) {
-      if (listener.modern != null)
+      if (listener.legacy) listenWithNumber(listener,flags);
+      else if (listener.modern != null)
         PlatformBridge.invoke(registry,"unregisterTelephonyCallback",listener.subscription,
             "root",null,listener.modern,false);
-    } else {
-      listener.modern = Api31.create(listener);
-      // 新接口只订阅状态，不要求读取通话记录权限。
-      android.os.Handler main = new android.os.Handler(device.context.getMainLooper());
-      PlatformBridge.invoke(registry,"registerTelephonyCallback",true,true,
-          (java.util.concurrent.Executor)main::post, listener.subscription, "root",null,listener.modern,true);
+      return;
     }
+    try {
+      // 沿用系统 Binder 封装和 APKless root 身份，订阅带号码的旧事件。
+      listenWithNumber(listener,flags);
+      listener.legacy = true;
+      return;
+    } catch (Exception legacyUnavailable) {
+      if (afterRegistrationAppOpsReport(legacyUnavailable)) {
+        // HyperOS 在读取 Binder 回包的 AppOps 诊断信息时抛错。注册是否成功以
+        // 系统初始回调为准；超时后再切回仅状态监听。
+        listener.legacy = true;
+        return;
+      }
+      callerIdError = legacyUnavailable;
+      try { listenWithNumber(listener,PhoneStateListener.LISTEN_NONE); }
+      catch (Exception ignored) {}
+    }
+    listenStateOnly(listener);
+  }
+
+  private static boolean afterRegistrationAppOpsReport(Exception error) {
+    if (!(error instanceof NullPointerException)) return false;
+    for (StackTraceElement frame : error.getStackTrace()) {
+      if (frame.getClassName().equals("android.app.AppOpsManager$1")
+          && frame.getMethodName().equals("reportStackTraceIfNeeded")) return true;
+    }
+    return false;
+  }
+
+  private void listenStateOnly(CallListener listener) throws Exception {
+    listener.modern = Api31.create(listener);
+    android.os.Handler main = new android.os.Handler(device.context.getMainLooper());
+    PlatformBridge.invoke(registry,"registerTelephonyCallback",true,true,
+        (java.util.concurrent.Executor)main::post, listener.subscription, "root",null,listener.modern,true);
+  }
+
+  private void listenWithNumber(CallListener listener, int flags) throws Exception {
+    boolean enable = flags != PhoneStateListener.LISTEN_NONE;
+    if (numberCallback == null) {
+      numberRegistry = Device.service("telephony.registry","com.android.internal.telephony.ITelephonyRegistry");
+      java.lang.reflect.Field event = Class.forName("android.telephony.TelephonyCallback")
+          .getDeclaredField("EVENT_LEGACY_CALL_STATE_CHANGED");
+      event.setAccessible(true);
+      numberEvents = new int[]{event.getInt(null)};
+      java.lang.reflect.Field callback = PhoneStateListener.class.getDeclaredField("callback");
+      callback.setAccessible(true);
+      numberCallback = callback;
+    }
+    PlatformBridge.invoke(numberRegistry,"listenWithEventList",true,true,listener.subscription,
+        "root",null,numberCallback.get(listener),enable?numberEvents:new int[0],enable);
   }
 
   private static final class Api31 extends android.telephony.TelephonyCallback
@@ -110,11 +181,17 @@ final class EventSources implements AutoCloseable {
 
   int watchedSubscriptions() { return calls.size(); }
 
+  int callerIdSubscriptions() {
+    int count = 0;
+    for (CallListener call : calls) if (call.legacy || call.manager != null) count++;
+    return count;
+  }
+
   private final class CallListener extends PhoneStateListener {
     final int subscription;
     TelephonyManager manager;
     Object modern;
-    boolean initialized, ringing;
+    boolean initialized, ringing, legacy;
     CallListener(int subscription) { this.subscription = subscription; }
 
     @Override public void onCallStateChanged(int state, String number) {

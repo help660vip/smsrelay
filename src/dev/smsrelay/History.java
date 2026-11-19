@@ -13,13 +13,20 @@ final class History {
     db.execSQL("CREATE TABLE IF NOT EXISTS relay_events (message INTEGER PRIMARY KEY, kind TEXT NOT NULL,"
         + " source TEXT, title TEXT, body TEXT, pkg TEXT, category TEXT, occurred INTEGER NOT NULL,"
         + " captured INTEGER NOT NULL, decision TEXT NOT NULL, expires INTEGER NOT NULL DEFAULT 0,"
-        + " synthetic INTEGER NOT NULL DEFAULT 0)");
+        + " synthetic INTEGER NOT NULL DEFAULT 0, receiver TEXT)");
+    // 老记录按原样保留，避免把换卡后的号码写回历史。
+    boolean hasReceiver = false;
+    try (Cursor columns = db.rawQuery("PRAGMA table_info(relay_events)",null)) {
+      int name = columns.getColumnIndexOrThrow("name");
+      while (columns.moveToNext()) if (columns.getString(name).equals("receiver")) hasReceiver = true;
+    }
+    if (!hasReceiver) db.execSQL("ALTER TABLE relay_events ADD COLUMN receiver TEXT");
     db.execSQL("CREATE TABLE IF NOT EXISTS relay_steps (id INTEGER PRIMARY KEY, message INTEGER NOT NULL,"
         + " task INTEGER, channel TEXT, at INTEGER NOT NULL, state TEXT NOT NULL, reason TEXT, attempt INTEGER)");
     db.execSQL("CREATE INDEX IF NOT EXISTS relay_steps_message ON relay_steps(message,id)");
   }
 
-  void event(long message, Routing.Event event, String decision, boolean synthetic) {
+  void event(long message, Routing.Event event, String decision, boolean synthetic) throws org.json.JSONException {
     ContentValues v = new ContentValues();
     v.put("message",message); v.put("kind",event.kind); v.put("source",event.source);
     v.put("title",event.title); v.put("body",event.kind.equals("call")?event.message():event.body); v.put("pkg",event.pkg);
@@ -27,6 +34,9 @@ final class History {
     long now = System.currentTimeMillis();
     v.put("captured",now); v.put("decision",decision); v.put("synthetic",synthetic ? 1 : 0);
     v.put("expires",event.kind.equals("call") ? event.occurred + 600000L : 0L);
+    if (event.kind.equals("call") || event.kind.equals("sms"))
+      v.put("receiver",new JSONObject().put("slot",event.slot).put("number",event.receiverNumber)
+          .put("carrier",event.carrier).toString());
     db.insertOrThrow("relay_events",null,v);
     step(message,0,"",now,"received",decision,0);
     if (decision.equals("queued")) step(message,0,"",now,"queued","",0);
@@ -103,13 +113,14 @@ final class History {
   JSONObject detail(long id, String allowed) throws Exception {
     String[] args = {String.valueOf(id)};
     JSONObject result;
-    try (Cursor c = db.rawQuery("SELECT kind,source,title,body,pkg,category,occurred,captured,decision"
+    try (Cursor c = db.rawQuery("SELECT kind,source,title,body,pkg,category,occurred,captured,decision,receiver"
         + " FROM relay_events WHERE message=?",args)) {
       if (!c.moveToFirst()) throw new IllegalArgumentException("record_missing");
       result = new JSONObject().put("kind",c.getString(0)).put("source",c.getString(1))
           .put("title",c.getString(2)).put("body",c.getString(3)).put("pkg",c.getString(4))
           .put("category",c.getString(5)).put("occurred",c.getLong(6)).put("captured",c.getLong(7))
           .put("decision",c.getString(8));
+      if (!c.isNull(9)) result.put("receiver",new JSONObject(c.getString(9)));
     }
     JSONArray steps = new JSONArray(), tasks = new JSONArray();
     try (Cursor c = db.rawQuery("SELECT at,channel,task,state,reason,attempt FROM relay_steps"

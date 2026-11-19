@@ -44,6 +44,7 @@ final class WebPanel {
     switch(operation(req)) {
       case "status":
       case "start": return core.status();
+      case "dashboard": return new JSONObject().put("status",core.status()).put("settings",settings());
       case "settings": return settings();
       case "save": return save(req);
       case "apps": return new JSONObject().put("apps",apps());
@@ -73,7 +74,7 @@ final class WebPanel {
 
   private JSONObject share(long id) throws Exception {
     JSONObject redacted=core.db.history.detail(id,core.db.allowed(core.cfg));
-    for(String key:new String[]{"body","source","title","pkg","category"}) redacted.remove(key);
+    for(String key:new String[]{"body","source","title","pkg","category","receiver"}) redacted.remove(key);
     return new JSONObject().put("text",redacted.toString(2));
   }
 
@@ -131,7 +132,7 @@ final class WebPanel {
     Logger.atomic(file,content);
     try { core.apply(next); }
     catch (Exception e) { Logger.atomic(file,previous); throw e; }
-    return settings().put("saved",true).put("held",held);
+    return settings().put("saved",true).put("held",held).put("status",core.status());
   }
 
   private JSONArray apps() throws Exception {
@@ -156,10 +157,12 @@ final class WebPanel {
     String title=History.clip(req.optString("title","测试通知").replace('\r',' ').replace('\n',' '),120);
     String body=History.clip(req.optString("body","这是一条模拟消息"),1800);
     long now=System.currentTimeMillis();
+    int slot=req.optInt("slot",1);
+    Device.Sim sim=core.device.simAtSlot(slot);
     Routing.Event event=new Routing.Event(kind,"web-test:"+java.util.UUID.randomUUID(),source,
         kind.equals("call") ? "来电提醒 · "+source : kind.equals("sms") ? "新短信 · "+source : title,
         body,pkg,History.clip(req.optString("category"),120),now,
-        req.optInt("slot",1),req.optBoolean("noisy",false));
+        slot,req.optBoolean("noisy",false),sim.number,sim.carrier);
     String decision=Routing.effect(core.cfg,event,core.db.marker);
     JSONArray channels=new JSONArray();
     if (decision.equals("queued")) for(String channel:Routing.CHANNELS)
@@ -170,7 +173,7 @@ final class WebPanel {
     if (!req.optBoolean("confirmed")) throw new IllegalArgumentException("test_confirmation_required");
     if (now-core.db.value("last_web_test")<15000) throw new IllegalArgumentException("test_rate_limit");
     Routing.Event sample=new Routing.Event(kind,event.key,source,"[测试] "+event.title,
-        body,pkg,event.category,now,event.slot,event.noisy);
+        body,pkg,event.category,now,event.slot,event.noisy,event.receiverNumber,event.carrier);
     long id;
     core.db.begin();
     try { id=core.db.addEvent(sample,core.cfg,true,null); core.db.put("last_web_test",String.valueOf(now)); core.db.commit(); }

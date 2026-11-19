@@ -100,25 +100,32 @@ final class Routing {
   }
 
   static final class Event {
-    final String kind, key, source, title, body, pkg, category;
+    final String kind, key, source, title, body, pkg, category, receiverNumber, carrier;
     final long occurred;
     final int slot;
     final boolean noisy;
     Event(String kind, String key, String source, String title, String body, String pkg,
         String category, long occurred, int slot, boolean noisy) {
+      this(kind,key,source,title,body,pkg,category,occurred,slot,noisy,"未知","未知");
+    }
+    Event(String kind, String key, String source, String title, String body, String pkg,
+        String category, long occurred, int slot, boolean noisy, String receiverNumber, String carrier) {
+      this.receiverNumber=receiverNumber;
+      this.carrier=carrier;
       this.kind=kind; this.key=key; this.source=source; this.title=title; this.body=body;
       this.pkg=pkg; this.category=category; this.occurred=occurred; this.slot=slot; this.noisy=noisy;
     }
     static Event sms(StateDb.Sms sms) {
       return new Event("sms",sms.fingerprint(),sms.address,sms.subject(),sms.body,"","",
-          sms.date,sms.slot,false);
+          sms.date,sms.slot,false,sms.number,sms.carrier);
     }
     String message() {
       String time = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.ROOT).format(new Date(occurred));
+      String sim = "\n接收卡："+(slot>0?"卡"+slot:"未知")+" · "+carrier+"\n本机号码："+receiverNumber;
       if (kind.equals("sms"))
-        return "发件人："+source+"\n接收卡："+(slot>0?"卡"+slot:"未知")+"\n时间："+time+"\n\n"+body;
+        return "发件人："+source+sim+"\n时间："+time+"\n\n"+body;
       if (kind.equals("call"))
-        return "来电响铃提醒\n来电号码："+source+"\n响铃时间："+time+"\n接收卡："+(slot>0?"卡"+slot:"未知")
+        return "来电响铃提醒\n来电号码："+source+sim+"\n响铃时间："+time
             + (body.isEmpty()?"":"\n\n"+body);
       return "应用："+source+"\n标题："+title+"\n时间："+time+"\n\n"+body;
     }

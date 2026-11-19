@@ -47,7 +47,7 @@ public final class RelayCore implements AutoCloseable {
     h = handler;
     cfg = loadEffective(dir);
     log = new Logger(home, cfg);
-    log.log("INFO", "starting smsrelay 0.2.0");
+    log.log("INFO", "starting smsrelay 0.2.1");
     db = new StateDb(home);
     db.cleanup(cfg);
     device = new Device(h);
@@ -101,10 +101,11 @@ public final class RelayCore implements AutoCloseable {
   private void onRing(int sub, String number) {
     if (!Routing.enabled(cfg,"call")) return;
     long now = System.currentTimeMillis();
-    String name = number != null && !number.isEmpty() ? number : "未知号码";
+    String name = number != null && !number.trim().isEmpty() ? number.trim() : "未知号码";
+    Device.Sim sim = device.sim(sub);
     lastEvent.put("call",now);
     capture(new Routing.Event("call","call:"+java.util.UUID.randomUUID(),name,
-        "来电提醒 · "+name,"","","",now,device.sim(sub).slot,false),null);
+        "来电提醒 · "+name,"","","",now,sim.slot,false,sim.number,sim.carrier),null);
   }
 
   private void onNotification(android.service.notification.StatusBarNotification sbn) {
@@ -368,13 +369,14 @@ public final class RelayCore implements AutoCloseable {
         .put("pid", android.os.Process.myPid())
         .put("instance", instance)
         .put("running", true)
-        .put("version", "0.2.0")
+        .put("version", "0.2.1")
         .put("enabled", Routing.enabled(cfg,"sms"))
         .put("health", new JSONObject()
             .put("sms", health("sms",source.registered() ? "ready" : "disconnected"))
             .put("call",health("call",events.callState)
                 .put("ready_subscriptions",events.readySubscriptions())
-                .put("watched_subscriptions",events.watchedSubscriptions()))
+                .put("watched_subscriptions",events.watchedSubscriptions())
+                .put("caller_id_subscriptions",events.callerIdSubscriptions()))
             .put("notification",health("notification",events.notificationState)))
         .put("observer_registered", source.registered())
         .put("compatibility", source.branch())

@@ -1,6 +1,6 @@
 id=smsrelay
 name=smsrelay
-version=0.2.0
-versionCode=2
+version=0.2.1
+versionCode=3
 author=help660vip
 description=短信、响铃和应用通知可分别转发到企业微信或邮箱。用 KsuWebUI 管理规则、查看监听状态及详细收发记录。Magisk「操作」菜单仍可用于启动和诊断。

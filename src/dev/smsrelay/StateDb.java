@@ -39,19 +39,7 @@ public final class StateDb implements Closeable {
 
     public String text() {
       if (providerId < 0) return "smsrelay 渠道连通性测试\n\n" + body;
-      return "发件人："
-          + address
-          + "\n接收卡："
-          + (slot > 0 ? "卡" + slot : "未知")
-          + " · "
-          + carrier
-          + "\n本机号码："
-          + number
-          + "\n时间："
-          + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss Z", Locale.ROOT)
-              .format(new Date(date))
-          + "\n\n"
-          + body;
+      return Routing.Event.sms(this).message();
     }
   }
 
@@ -131,7 +119,7 @@ public final class StateDb implements Closeable {
 
   public boolean add(Sms s, Config cfg, boolean baseline) throws Exception {
     Routing.Event event = Routing.Event.sms(s);
-    return enqueue(event, s.providerId, s.text(), cfg, baseline, s.providerId < 0, null);
+    return enqueue(event, s.providerId, s.providerId < 0 ? s.text() : event.message(), cfg, baseline, s.providerId < 0, null);
   }
 
   long addEvent(Routing.Event event, Config cfg, boolean synthetic, String reason) throws Exception {
