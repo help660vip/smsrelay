@@ -1,49 +1,43 @@
 # smsrelay
 
-**把 Android 手机收到的新短信转发到企业微信或邮箱。**
+**把 Android 手机上的短信、响铃来电和指定应用通知转发到企业微信或邮箱。**
 
-smsrelay 是一个纯 Magisk 模块。可以任选企业微信机器人、SMTP 邮箱，或同时发送到两个渠道。适合把备用机、双卡手机上的来信集中到常用的群或邮箱。
+smsrelay 是纯 Magisk 模块。三个功能可以独立启用，分别选择企业微信机器人、SMTP 邮箱或两个渠道。适合备用机和双卡手机。转发服务由 Magisk 启动，WebUI 是可选的管理入口。
 
-[下载正式版](https://github.com/help660vip/smsrelay/releases/latest) · [新版 WebUI](docs/WEBUI.md) · [配置手册](docs/USAGE.md) · [兼容性](docs/COMPATIBILITY.md) · [反馈问题](https://github.com/help660vip/smsrelay/issues/new)
+[最新正式版](https://github.com/help660vip/smsrelay/releases/latest) · [WebUI 使用说明](docs/WEBUI.md) · [配置手册](docs/USAGE.md) · [兼容性](docs/COMPATIBILITY.md)
 
-## 能做什么
+## 下载 v0.2.1
 
-- **选择要转发的短信**：按 SIM 卡槽、发送号码和正文关键词筛选。通知附带发送号码、接收卡、运营商和短信原文。
-- **断网时先存下来**：待发任务保存在手机上，网络恢复后继续发送。两个渠道分别记录结果和重试。
-- **在 Magisk 里操作**：用模块的「操作」菜单查看状态、重载配置、发送测试消息或重试失败任务。
-- **按来信事件触发**：空闲时不定时查询短信。安装只需要 Magisk 模块 ZIP，无需额外 APK 或 LSPosed。
+[Magisk 模块 ZIP](https://github.com/help660vip/smsrelay/releases/download/v0.2.1/smsrelay-0.2.1.zip) · [SHA-256 校验文件](https://github.com/help660vip/smsrelay/releases/download/v0.2.1/smsrelay-0.2.1.zip.sha256) · [版本说明](https://github.com/help660vip/smsrelay/releases/tag/v0.2.1)
 
-## 快速上手
+### 这版修了什么
 
-需要已获取 root 权限且安装 Magisk 的 Android 手机。**已实测 Redmi K40 / HyperOS 1.0.10.0 / Android 13**。其他设备的验证情况见 [兼容矩阵](docs/COMPATIBILITY.md)。
+- **来电号码和双卡信息**　修复 Redmi K40 的来电提醒显示「未知号码」的问题。系统提供主叫号码时，在响铃阶段显示。短信和来电都显示接收卡、运营商以及该卡的本机号码。系统未提供的号码会显示为未知。
+- **WebUI 响应**　首屏和常规保存各使用一次后台请求，等待时页面会显示进度。规则预览明确标为「仅预览」，应用勾选数量即时更新。
+- **开机自启**　K40 上等到 Android 首次解锁再启动，避免提前打开加密的短信数据库。开机最多等约三分钟，超时后可在 WebUI 或 Magisk「操作」里启动。
 
-1. **下载 ZIP。** 打开 [最新 GitHub Release](https://github.com/help660vip/smsrelay/releases/latest)，在 **Assets** 下载 `smsrelay-*.zip`。同一页面提供 `.zip.sha256` 校验文件。
-2. **安装并重启。** 打开 Magisk → 模块 → 从本地安装，选中下载的 `smsrelay-*.zip`，直接安装后重启。
-3. **填写配置。** 用支持 root 的文件管理器打开 `/data/adb/smsrelay/config.json`。v0.1.0 把顶层 `enabled` 设为 `true`。使用带有 `routing` 的 v0.2.0 配置时，在 WebUI 打开短信，或将 `routing.sms.enabled` 设为 `true`。再打开所需渠道并填写下表中的字段。首次安装默认关闭转发，首次启用会跳过历史短信。
-4. **保存并测试。** 回到 Magisk → 模块 → smsrelay →「操作」，用音量上键切换、音量下键确认，执行「检查并重载配置」。选择对应渠道的固定测试消息，再检查群里或收件箱是否收到。
+## 安装与配置
 
-| 转发到 | 要填的配置 |
-| --- | --- |
-| 企业微信群 | 开启 `wecom.enabled`，填入 `wecom.webhook` |
-| 邮箱 | 开启 `smtp.enabled`，填写 `host`、`port`、`tls`、`username`、`password`、`from` 和收件人列表 `to` |
+已实测 **Redmi K40 / HyperOS 1.0.10.0 / Android 13**。使用其他设备可查看 [兼容矩阵](docs/COMPATIBILITY.md)。
 
-[带中文注释的配置模板](module/config/config.json)和[渠道示例](docs/USAGE.md#渠道设置)可以直接对照填写。文件保留 `config.json` 名称，支持 `//` 注释。三个筛选列表均为空时，会转发所有新收件短信。
+1. 打开 Magisk → 模块 → 从本地安装，选中 ZIP。安装后重启并解锁一次。升级保留配置和队列。
+2. 使用 [KsuWebUIStandalone](https://github.com/5ec1cff/KsuWebUIStandalone) 打开 `smsrelay`，在「规则与渠道」填写企业微信 Webhook 或 SMTP 设置，再勾选各功能使用的渠道。
+3. 用「规则预览」检查匹配结果。点「测试这条路线」并确认后，会向配置的渠道发送一条带测试标记的消息。收发时间和逐渠道结果可在「收发记录」查看。
 
-## WebUI 与更多转发类型
-
-v0.2.x 开发版新增响铃提醒和应用通知。短信、来电和应用通知可以分别开关，并各选企业微信、邮箱或两个渠道。在 Magisk 手机上，用 KsuWebUIStandalone 打开 `smsrelay`，可以选应用、预览规则、检查监听和查看收发记录。有了 WebUI 仍可继续用 Magisk「操作」菜单。[新版上手与兼容限制](docs/WEBUI.md)
+也可以用支持 root 的文件管理器编辑 `/data/adb/smsrelay/config.json`。文件支持 `//` 注释。改完后在 Magisk「操作」菜单选择「检查并重载配置」。首次安装默认关闭转发，首次启用短信会跳过历史短信。[带中文注释的配置模板](module/config/config.json)
 
 ## 日常使用
 
-- **查看是否正常运行**：在「操作」中选「查看服务状态 / SIM 识别状态」。`observer_registered` 为 `true` 表示监听已就绪。
-- **改好密码后补发**：先重载配置，再选「手动重试失败任务」，只补发同一目标中尚未成功的任务。
-- **临时停止**：选「停止服务」。如果要停用或卸载，先停止服务，再在 Magisk 中操作。配置和待发队列默认保留。
+- 短信可按卡槽、发件号码和正文关键词筛选。应用通知按白名单转发应用名、标题和正文。来电提醒在进入响铃时触发一次。
+- 断网时保存待发消息，网络恢复后继续发送。企业微信与邮件分别记录结果，可以补发原目标中尚未成功的任务。
+- WebUI 可检查监听、查看收发记录和运行日志。完整记录保存在手机，分享时可以导出脱敏内容。
+- 可从 Magisk「操作」停止服务。菜单用音量上键切换、音量下键确认。通过 Magisk 停用或卸载前可先停止服务，配置和队列默认保留。
 
-遇到问题可用「导出脱敏诊断」，记录手机型号、系统版本、Magisk 版本和失败渠道后提交 [Issue](https://github.com/help660vip/smsrelay/issues/new)。
+遇到问题可附上脱敏诊断、手机型号和系统版本提交反馈。[提交 Issue](https://github.com/help660vip/smsrelay/issues/new)
 
 ## 从源码构建
 
-在仓库根目录打开 PowerShell 7，准备依赖后再构建：
+在仓库根目录使用 PowerShell 7：
 
 ~~~powershell
 .\scripts\prepare-tools.ps1 -Tools .\tools
@@ -51,4 +45,4 @@ v0.2.x 开发版新增响铃提醒和应用通知。短信、来电和应用通�
 .\scripts\test-host.ps1 -Tools .\tools
 ~~~
 
-模块 ZIP 和 SHA-256 校验文件会生成在 `dist/`。[设备验收与离线测试](docs/TESTING.md) · [实现与设计](docs/DESIGN.md) · [MIT 许可证](LICENSE)
+模块 ZIP 和 SHA-256 校验文件生成在 `dist/`。[设备验收与离线测试](docs/TESTING.md) · [设计文档](docs/DESIGN.md) · [MIT 许可证](LICENSE)
