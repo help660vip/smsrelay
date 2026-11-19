@@ -7,6 +7,7 @@ $stateDir="/data/local/tmp/$run"
 $template=Get-Content "$root\module\config\config.json" -Raw -Encoding UTF8
 $config=$template | ConvertFrom-Json
 $config.enabled=$true;$config.wecom.enabled=$true;$config.smtp.enabled=$true
+if($config.routing){$config.routing.sms.enabled=$true}
 $config.wecom.webhook='https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=LOCAL-TEST'
 $config | ConvertTo-Json -Depth 8 | Set-Content "$root\build\offline-test.json" -Encoding utf8
 & $adb -s $Serial push "$root\build\smsrelay.jar" /data/local/tmp/smsrelay-offline-test.jar

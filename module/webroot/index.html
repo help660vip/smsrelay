@@ -1,0 +1,369 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="color-scheme" content="light">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data: ksu:; base-uri 'none'; form-action 'none'">
+<title>smsrelay · 转发控制台</title>
+<style>
+:root{--paper:#f5f3ee;--ink:#202522;--muted:#555f56;--line:#d4d7cf;--surface:#fffdf8;--accent:#9d3f29;--accent-ink:#762e1e;--dark:#202924;--pale:#d8e2d7;--ok:#235239;--radius:7px;--pad:clamp(18px,4vw,42px)}
+*{box-sizing:border-box}body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.55 -apple-system,BlinkMacSystemFont,"PingFang SC","Noto Sans CJK SC","Microsoft YaHei",sans-serif}
+button,input,textarea,select{font:inherit;color:inherit}button{cursor:pointer}
+button:disabled{cursor:default;opacity:.55}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.wrap{max-width:1080px;margin:auto;padding-inline:var(--pad)}
+header{background:var(--dark);color:#f8f7ee;padding-top:env(safe-area-inset-top)}
+.top{display:flex;justify-content:space-between;align-items:center;gap:12px;padding-block:18px;border-bottom:1px solid #48544b}
+.wordmark{font-size:22px;letter-spacing:-.055em;font-weight:750}.version{font:12px ui-monospace,monospace;color:var(--pale);margin-left:8px}
+.hero{display:flex;align-items:end;justify-content:space-between;gap:28px;padding-block:34px 28px}
+.hero h1{font-weight:670;letter-spacing:-.06em;font-size:clamp(38px,6vw,66px);line-height:1.04;margin:0 0 11px}
+.hero p{margin:0;color:#d0d8d0}.status-count{display:flex;align-self:stretch;gap:24px;align-items:end;flex:none}
+.count{min-width:50px;display:grid;gap:3px;color:#d0d8d0;font-size:13px}.count strong{font:620 32px/1 ui-monospace,monospace;color:white}
+nav{background:var(--surface);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:2}
+.nav-inner{display:flex;gap:clamp(12px,4vw,36px)}
+.nav-tab{background:transparent;border:0;border-bottom:3px solid transparent;padding:13px 3px 11px;min-height:46px;color:var(--muted);white-space:nowrap}
+.nav-tab[aria-current="page"]{border-color:var(--accent);color:var(--ink);font-weight:720}
+main{padding-block:26px max(38px,env(safe-area-inset-bottom))}
+h2,h3,p{overflow-wrap:anywhere}h2{margin:0;font-size:26px;letter-spacing:-.05em;line-height:1.22}h3{margin:0;font-size:17px}
+.hint,small{color:var(--muted);font-size:13px}small{display:block;margin-top:3px}
+.section{margin-bottom:30px}.section-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+.line{display:flex;justify-content:space-between;align-items:center;gap:16px;padding:15px 17px}
+.line+.line,.split+.split{border-top:1px solid var(--line)}
+.line strong{display:block}.line .end{text-align:end;flex:none}
+.good{color:var(--ok)}.bad{color:var(--accent-ink)}.unknown{color:var(--muted)}
+.btn{border:1px solid #a6afa5;border-radius:var(--radius);background:transparent;padding:8px 13px;min-height:40px;font-weight:650;white-space:nowrap}
+header .btn{border-color:#78877c;color:inherit}.btn.primary{background:var(--accent);color:white;border-color:var(--accent)}.btn:hover:not(:disabled){filter:brightness(.92)}
+.switch{display:inline-flex;min-width:88px;align-items:center;justify-content:space-between;border:1px solid #a9b1a7;border-radius:24px;background:#e8ebe4;padding:6px 9px;gap:7px;font-size:13px;font-weight:700}
+.switch:before{content:"";height:17px;width:17px;background:var(--surface);border:1px solid #7a877b;border-radius:50%}
+.switch[aria-checked="true"]{background:var(--dark);color:#f7f8f1;border-color:var(--dark)}
+.switch[aria-checked="true"]:before{background:#faf8ed}
+.split{padding:17px}.split h3{margin-bottom:8px}.stack{display:grid;gap:12px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:13px}
+label.field{display:grid;gap:4px;font-size:13px;font-weight:650}
+input:not([type=checkbox]),textarea,select{width:100%;min-width:0;min-height:38px;border:1px solid #a9b1a7;background:#fffefa;border-radius:5px;padding:7px 9px}
+textarea{resize:vertical}input[type=checkbox]{width:19px;height:19px;accent-color:var(--accent);margin:0 6px 0 0;vertical-align:middle}.choice{display:inline-flex;align-items:center;min-height:38px;margin-right:12px}
+.toolbar{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.toolbar>*{width:auto}.toolbar input,.toolbar select{width:auto;max-width:100%}
+.app-list{max-height:320px;overflow:auto;margin-top:8px}.app-list label{cursor:pointer}.app-list .line{justify-content:start;padding:9px 10px}
+.app-icon{width:30px;height:30px;object-fit:contain;border-radius:5px;background:#ebeee6;display:grid;place-items:center;flex:none;font-weight:700;color:#414b42}
+.app-name{min-width:0;overflow-wrap:anywhere}.spaced{margin-top:12px}.wide{width:100%}
+details.split>summary{font-weight:720;cursor:pointer;margin-bottom:8px}details:not([open])>summary{margin-bottom:0}
+.notice{margin-bottom:14px;min-height:0;color:var(--muted)}.notice.error{color:var(--accent-ink);background:#f9e9e0;border:1px solid #e7b7a6;padding:9px 12px;border-radius:5px}
+.history-row{width:100%;border:0;background:transparent;text-align:left;color:inherit}.history-row:hover{background:#ebeee6}
+.log{overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;margin:0;background:var(--dark);color:#f2f5ef;padding:17px;border-radius:var(--radius);font:12px/1.65 ui-monospace,monospace}
+.article{white-space:pre-wrap;overflow-wrap:anywhere;padding:13px;background:#f0efe8;border:1px solid var(--line)}
+dialog{width:min(620px,calc(100% - 24px));max-height:88svh;border:1px solid #8b958a;border-radius:var(--radius);background:var(--surface);color:var(--ink);padding:18px}
+dialog::backdrop{background:#121911a0}.timeline{list-style:none;margin:0;padding:0}.timeline li{padding:8px 0;border-bottom:1px solid var(--line)}
+.empty{padding:20px;color:var(--muted)}
+@media(max-width:620px){.hero{display:block;padding-block:25px 20px}.status-count{margin-top:20px}.count strong{font-size:26px}.grid{grid-template-columns:minmax(0,1fr)}.section-head{align-items:start}.toolbar input{flex:1;min-width:130px}.line{padding:13px 12px}}
+</style>
+</head>
+<body>
+<header><div class="wrap">
+<div class="top"><div><span class="wordmark">smsrelay</span><span class="version" id="version"></span></div><button class="btn" id="refresh">刷新状态</button></div>
+<div class="hero"><div><h1>转发控制台</h1><p id="summary">正在读取服务状态</p></div>
+<div class="status-count"><span class="count"><strong id="pending">—</strong>待发送</span><span class="count"><strong id="failed">—</strong>发送失败</span></div></div>
+</div></header>
+<nav><div class="wrap nav-inner" aria-label="页面导航">
+<button class="nav-tab" data-page="overview" aria-current="page">概览</button>
+<button class="nav-tab" data-page="rules">规则与渠道</button>
+<button class="nav-tab" data-page="history">收发记录</button>
+<button class="nav-tab" data-page="logs">运行日志</button>
+</div></nav>
+<main class="wrap"><div id="banner" class="notice" role="status" aria-live="polite"></div><div id="view"></div></main>
+<dialog id="detail" aria-labelledby="detail-title"><div id="detail-content"></div></dialog>
+<script>
+(function() {
+"use strict";
+const $=s=>document.querySelector(s);
+const names={sms:"短信转发",call:"来电提醒",notification:"应用通知",smtp:"邮箱",wecom:"企业微信"};
+const terms={ready:"监听已就绪",disabled:"功能已关闭",connecting:"正在连接",disconnected:"监听已断开",
+  feature_disabled:"功能未开启",app_not_selected:"应用未勾选",sms_filtered:"未命中短信筛选",
+  loop_prevented:"已阻止转发循环",notification_channel_excluded:"通知类别已排除",
+  ongoing_or_group_summary:"跳过持续通知或分组摘要",no_active_channel:"没有可用渠道",
+  queued:"已入队",received:"已收到",sending:"正在发送",retry_wait:"等待重试",
+  waiting_network:"等待网络",throttled:"渠道限频",duplicate_update:"合并重复更新",
+  unchanged_notification:"通知内容没有变化",manual_retry:"手动重试",expired:"已过期",
+  pending:"待发送",succeeded:"服务器已接受",failed:"发送失败",call_expired:"来电提醒过期",
+  PENDING:"待发送",SENDING:"正在发送",SUCCEEDED:"服务器已接受",FAILED:"发送失败",EXPIRED:"已过期",
+  server_accepted:"服务器已接受",wecom_interval:"等待企业微信发送间隔",network_unavailable:"网络不可用",
+  notification_interval:"等待普通通知邮件的发送间隔",
+  hold_pending:"变更可能暂停已有任务"};
+const errors={service_offline:"后台服务未运行",bad_request:"无法读取模块响应",config_changed:"配置刚刚被其他操作修改，请刷新后重新编辑",
+  config_not_applied:"文件有还未应用的修改，请先在 Magisk 操作菜单重载",validation_failed:"配置校验失败，原配置仍在使用",
+  retry_unavailable:"这条任务已过期、已处理，或原目标已停用",test_rate_limit:"测试发送至少相隔 15 秒",record_missing:"记录已过保留期限"};
+const view=$("#view");
+let page="overview", status=null, settings=null, apps=null, bridge,
+  busy=false, draft=null, filters={kind:"",state:"",channel:"",search:"",from:0}, before=null;
+const text=(v)=>v==null?"":String(v);
+function esc(v){return text(v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));}
+const tr=v=>terms[v] || v || "—";
+const when=v=>v?new Date(v).toLocaleString("zh-CN",{hour12:false}):"—";
+const kindKeys=["sms","call","notification"];
+function showMsg(s,fail=false){$("#banner").textContent=s;$("#banner").classList.toggle("error",fail);}
+function encode(obj){
+  const bytes=new TextEncoder().encode(JSON.stringify(obj));
+  let raw="";for(const b of bytes)raw+=String.fromCharCode(b);
+  return btoa(raw).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"");
+}
+function asyncExec(cmd) {
+  return new Promise((resolve,reject)=>{
+    const id="smsrelayResult"+Math.random().toString(36).slice(2);
+    const timer=setTimeout(()=>{delete window[id];reject(new Error("操作超时，可刷新状态确认结果"));},42000);
+    window[id]=(code,out)=>{clearTimeout(timer);delete window[id];Number(code)===0?resolve(out):reject(new Error("模块命令未成功"));};
+    try {window.ksu.exec(cmd,"{}",id);} catch(e){clearTimeout(timer);delete window[id];reject(e);}
+  });
+}
+function connector(){
+  if (!window.ksu || typeof window.ksu.exec!=="function") throw new Error("请从 KsuWebUI 打开 smsrelay。");
+  try {
+    const out=window.ksu.exec("printf smsrelay_bridge");
+    if(typeof out==="string" && out.trim()==="smsrelay_bridge") return cmd=>Promise.resolve(window.ksu.exec(cmd));
+  } catch(_) {}
+  return asyncExec;
+}
+async function call(payload){
+  if(!bridge) bridge=connector();
+  const value=encode(payload);
+  if(value.length>49152)throw new Error("提交内容过长。");
+  const cmd="printf '%s\\n' '"+value+"' | /data/adb/modules/smsrelay/webctl";
+  const reply=await bridge(cmd);
+  const lines=text(reply).trim().split(/\r?\n/);
+  let result;
+  try {result=JSON.parse(lines[lines.length-1]);} catch(_){throw new Error("模块没有返回有效状态。");}
+  if(result.error)throw new Error(errors[result.error]||result.error);
+  return result;
+}
+function btn(label,action,primary=false){return '<button class="btn'+(primary?' primary':'')+'" data-action="'+action+'">'+label+'</button>';}
+function renderHeader(){
+  $("#version").textContent=status?.version?"v"+status.version:"";
+  $("#summary").textContent=status?.running?"后台正在运行 · "+(status.online?"网络可用":"等待网络"):"后台状态未就绪";
+  $("#pending").textContent=status?((status.queue?.PENDING||0)+(status.queue?.SENDING||0)):"—";
+  if(status?.queue?.HELD)$("#summary").textContent+=" · "+status.queue.HELD+" 项暂缓";
+  $("#failed").textContent=status?(status.queue?.FAILED||0):"—";
+}
+function healthText(h){return !h?.enabled?"功能已关闭":h?.listener?.startsWith("unavailable")?"系统监听不可用":tr(h?.listener);}
+function channelText(rule){return ["wecom","smtp"].filter(x=>rule?.[x]).map(x=>names[x]+(settings?.[x]?.enabled?"":"（渠道关闭）")).join("、")||"未选渠道";}
+function overview(){
+  if(!status){view.innerHTML='<section class="card empty">可通过下方按钮启动模块后台。<div class="spaced">'+btn("启动服务","start",true)+'</div></section>';return;}
+  view.innerHTML='<section class="section"><div class="section-head"><h2>功能与监听</h2>'+btn("检查监听","listeners")+'</div><div class="card">'
+    +kindKeys.map(k=>{const h=status.health?.[k],r=settings?.routing?.[k];return '<div class="line"><div><strong>'+names[k]+'</strong><small>'
+      +esc(channelText(r))+'</small><small>最近事件　'+esc(when(h?.last_event))+(k==="call"&&h?.watched_subscriptions?" · "+h.ready_subscriptions+"/"+h.watched_subscriptions+" 个订阅就绪":"")+'</small></div><div class="end"><button class="switch" role="switch" aria-label="'+names[k]+'" aria-checked="'+!!h?.enabled+'" data-action="toggle-'+k+'" '+(!r?'disabled':'')+'>'
+      +(h?.enabled?'已开启':'已关闭')+'</button><small class="'+(h?.listener==="ready"&&h?.enabled?"good":h?.enabled?"bad":"unknown")+'">'+esc(healthText(h))+'</small></div></div>';}).join("")
+    +'</div></section><section class="section"><div class="section-head"><h2>通道</h2></div><div class="card">'
+    +["wecom","smtp"].map(k=>'<div class="line"><div><strong>'+names[k]+'</strong><small>'+ (k==="smtp"?"邮件提交后以服务器响应为准":"机器人业务响应确认发送")+'</small></div><span>'+ (settings?.[k]?.enabled?"已启用":"未启用")+'</span></div>').join("")
+    +'</div></section>';
+}
+function labelField(title,id,value="",attr="",type="text"){
+  return '<label class="field">'+title+'<input type="'+type+'" id="'+id+'" value="'+esc(value)+'" '+attr+'></label>';
+}
+function box(text,id,checked){return '<label class="choice"><input type="checkbox" id="'+id+'" '+(checked?"checked":"")+'>'+text+'</label>';}
+function selectOptions(options,current){return Object.entries(options).map(([k,v])=>'<option value="'+esc(k)+'" '+(k===current?"selected":"")+'>'+esc(v)+'</option>').join("");}
+function sampleControls(){
+  return '<section class="section"><div class="section-head"><h2>规则预览</h2></div><div class="card split stack"><div class="grid">'
+    +'<label class="field">模拟来源<select id="sample-kind">'+selectOptions(namesForKinds(),"sms")+'</select></label>'
+    +labelField("号码（短信与来电）","sample-source","","placeholder=\"例如 10086\"")
+    +labelField("应用包名（应用通知）","sample-pkg","","list=\"app-packages\"")
+    +labelField("通知类别（可选）","sample-category")
+    +labelField("卡槽（可选）","sample-slot","1",'min="0" max="8"',"number")
+    +labelField("通知标题","sample-title","模拟标题")
+    +'</div><label class="field">正文<textarea id="sample-body" rows="2">这是一条模拟消息</textarea></label><small>预览使用已保存的规则。测试路线会实际发送标记为测试的消息。</small>'
+    +'<div class="toolbar">'+btn("预览匹配","preview")+btn("测试这条路线","test")+'</div><pre id="preview-result" class="article" hidden></pre></div></section>';
+}
+function namesForKinds(){return {sms:names.sms,call:names.call,notification:names.notification};}
+function renderRules(){
+  if(!settings){view.innerHTML='<div class="card empty">启动后台后可编辑配置。</div>';return;}
+  draft=JSON.parse(JSON.stringify(settings));
+  const s=draft,w=s.wecom,m=s.smtp;
+  view.innerHTML='<section class="section"><div class="section-head"><h2>转发规则</h2>'+btn("保存并应用","save",true)+'</div><div class="card">'
+    + kindKeys.map(k=>'<div class="split"><h3>'+names[k]+'</h3>'+box("启用",k+"-enabled",s.routing[k].enabled)
+    +box("企业微信",k+"-wecom",s.routing[k].wecom)+box("邮箱",k+"-smtp",s.routing[k].smtp)
+    +(k==="notification"?'<div class="spaced toolbar"><input id="app-search" aria-label="搜索应用" placeholder="搜索应用名或包名">'+btn("加载应用","apps")+'</div><div class="app-list" id="apps"></div><datalist id="app-packages"></datalist>'
+      +labelField("排除的通知类别（包名/类别，逗号分隔）","excluded",(s.routing[k].exclude_channels||[]).join(", ")):"")+'</div>').join("")
+    +'<div class="split grid">'+labelField("短信卡槽","sim-slots",(s.filters.sim_slots||[]).join(", "))
+    +labelField("短信发送号码","sms-numbers",(s.filters.numbers||[]).join(", "))
+    +labelField("短信关键词","sms-keywords",(s.filters.keywords||[]).join(", "))
+    +labelField("完成记录全文保留（天）","history-days",s.history_days,'min="1" max="30"',"number")
+    +'</div></div></section><section class="section"><div class="section-head"><h2>渠道设置</h2></div><div class="card"><details class="split"><summary>企业微信</summary>'
+    +box("启用企业微信","wecom-enabled",w.enabled)+labelField("Webhook","webhook","",'placeholder="'+(w.configured?"已配置，留空保留":"填写完整机器人地址")+'" autocomplete="off"',"password")
+    +'</details><details class="split"><summary>SMTP 邮箱</summary>'+box("启用邮箱","smtp-enabled",m.enabled)
+    +'<div class="grid">'+labelField("SMTP 主机","smtp-host",m.host)+labelField("端口","smtp-port",m.port,'min="1" max="65535"',"number")
+    +'<label class="field">连接方式<select id="smtp-tls">'+selectOptions({implicit:"隐式 TLS",starttls:"STARTTLS"},m.tls)+'</select></label>'
+    +labelField("账号","smtp-username",m.username)+labelField("发件地址","smtp-from",m.from)
+    +labelField("授权码或密码","smtp-password","",'placeholder="'+(m.configured?"已配置，留空保留":"填写 SMTP 授权码")+'" autocomplete="new-password"',"password")
+    +labelField("收件人（逗号分隔）","smtp-to",(m.to||[]).join(", "))+'</div></details></div></section>'+sampleControls();
+  $("#app-search").addEventListener("input",renderApps);
+  renderApps();
+}
+function renderApps(){
+  const box=$("#apps");if(!box||!draft)return;
+  const selected=draft.routing.notification.apps||[];
+  if(!apps){box.innerHTML='<p class="hint">已选 '+selected.length+' 个应用。加载后可按名称搜索。</p>';return;}
+  const filter=$("#app-search").value.trim().toLowerCase();
+  const matched=apps.filter(a=>(filter||!a.system||selected.includes(a.pkg))&&
+    (a.label+" "+a.pkg).toLowerCase().includes(filter)).slice(0,80);
+  box.innerHTML='<p class="hint">已选 '+selected.length+' 个应用'+(matched.length===80?' · 显示前 80 项，继续搜索可缩小范围':'')+'</p>'
+    +matched.map(a=>'<label class="line"><input type="checkbox" data-app="'+esc(a.pkg)+'" '+(selected.includes(a.pkg)?"checked":"")+'>'
+      +'<span class="app-icon">'+esc(a.label.slice(0,1))+'</span><span class="app-name"><strong>'+esc(a.label)+'</strong><small>'+esc(a.pkg)+'</small></span></label>').join("");
+  $("#app-packages").innerHTML=apps.map(a=>'<option value="'+esc(a.pkg)+'">'+esc(a.label)+'</option>').join("");
+}
+const items=v=>v.split(/[\n,，]/).map(x=>x.trim()).filter(Boolean);
+function readChanges(){
+  const c={};
+  const field=id=>$("#"+id).value;
+  function update(key,value,previous){if(JSON.stringify(value)!==JSON.stringify(previous))c[key]=value;}
+  const selected=draft.routing.notification.apps||[];
+  const routeChanged=kindKeys.some(k=>["enabled","wecom","smtp"].some(f=>$("#"+k+"-"+f).checked!==settings.routing[k][f]));
+  if(routeChanged||JSON.stringify(selected)!==JSON.stringify(settings.routing.notification.apps||[])
+      ||JSON.stringify(items(field("excluded")))!==JSON.stringify(settings.routing.notification.exclude_channels||[])){
+    for(const k of kindKeys)for(const f of ["enabled","wecom","smtp"])c["routing."+k+"."+f]=$("#"+k+"-"+f).checked;
+    update("routing.notification.apps",selected,settings.routing.notification.apps||[]);
+    update("routing.notification.exclude_channels",items(field("excluded")),settings.routing.notification.exclude_channels||[]);
+  }
+  update("filters.sim_slots",items(field("sim-slots")).map(Number),settings.filters.sim_slots);
+  update("filters.numbers",items(field("sms-numbers")),settings.filters.numbers);
+  update("filters.keywords",items(field("sms-keywords")),settings.filters.keywords);
+  update("retention.history_days",Number(field("history-days")),settings.history_days);
+  update("wecom.enabled",$("#wecom-enabled").checked,settings.wecom.enabled);
+  if(field("webhook"))c["wecom.webhook"]=field("webhook");
+  update("smtp.enabled",$("#smtp-enabled").checked,settings.smtp.enabled);
+  for(const f of ["host","tls","username","from"])update("smtp."+f,field("smtp-"+f),settings.smtp[f]);
+  update("smtp.port",Number(field("smtp-port")),settings.smtp.port);
+  update("smtp.to",items(field("smtp-to")),settings.smtp.to);
+  if(field("smtp-password"))c["smtp.password"]=field("smtp-password");
+  return c;
+}
+async function save(changes){
+  if(!Object.keys(changes).length){showMsg("没有修改需要保存。");return;}
+  const payload={op:"save",changes,revision:settings.revision};
+  let reply=await call(payload);
+  if(reply.confirmation){
+    if(!confirm("这次修改将使 "+reply.count+" 个待发任务暂停。旧内容不会改发到新地址。继续保存？"))return;
+    reply=await call({...payload,confirm_hold:true});
+  }
+  settings=reply;
+  status=await call({op:"status"});
+  renderHeader();
+  if(page==="rules")renderRules();else overview();
+  showMsg(reply.held?"配置已生效。暂停的待发任务："+reply.held:"配置已生效。");
+}
+function history(){
+  view.innerHTML='<section class="section"><div class="section-head"><h2>收发记录</h2></div><div class="toolbar">'
+    +'<select id="filter-kind" aria-label="按功能筛选">'+selectOptions({"":"全部功能",...namesForKinds()},filters.kind)+'</select>'
+    +'<select id="filter-channel" aria-label="按渠道筛选">'+selectOptions({"":"全部渠道",wecom:names.wecom,smtp:names.smtp},filters.channel)+'</select>'
+    +'<select id="filter-state" aria-label="按状态筛选">'+selectOptions({"":"全部状态",PENDING:"待发送",SUCCEEDED:"已接受",FAILED:"失败",EXPIRED:"过期"},filters.state)+'</select>'
+    +'<input id="filter-since" aria-label="起始日期" type="date">'
+    +'<input id="filter-search" aria-label="搜索来源" placeholder="搜来源、包名或标题" value="'+esc(filters.search)+'">'+btn("筛选","filter",true)
+    +'</div><div class="card spaced" id="history-list"></div><div class="spaced" id="more-wrap"></div></section>';
+  if(filters.from)$("#filter-since").value=new Date(filters.from).toLocaleDateString("sv-SE");
+}
+async function loadHistory(append=false){
+  const list=$("#history-list");if(!list)return;
+  if(!append)before=null;
+  const reply=await call({op:"history",...filters,...(before?{before}:{})});
+  const rows=reply.rows||[];
+  const content=rows.map(r=>'<button class="line history-row" data-action="detail-'+r.id+'"><div><strong>'
+      +esc(r.title||r.source||names[r.kind])+'</strong><small>'+esc(names[r.kind]||(r.kind==='test'?'渠道测试':r.kind))+(r.synthetic&&r.kind!=='test'?' · 测试':'')+' · '+esc(when(r.captured))+'</small></div><span class="end">'
+     +esc(r.states?r.states.split(",").map(tr).join(" / "):tr(r.decision))+'</span></button>').join("");
+  if(append)list.insertAdjacentHTML("beforeend",content);
+  else list.innerHTML=content||'<div class="empty">这里会显示 v0.2.0 开始记录的事件。</div>';
+  before=rows.length?rows[rows.length-1].id:before;
+  $("#more-wrap").innerHTML=rows.length===40?btn("更早的记录","older"):"";
+}
+async function showDetail(id){
+  const r=await call({op:"detail",id});
+  $("#detail-content").innerHTML='<div class="section-head"><h2 id="detail-title">'+esc(r.title||names[r.kind])+'</h2>'+btn("关闭","close-detail")+'</div>'
+    +'<p class="hint">'+esc(r.source)+' · '+esc(when(r.occurred))+(r.category?' · '+esc(r.category):'')+'</p>'
+    +'<div class="article">'+esc(r.body||(r.kind==="call"?"响铃事件":"系统未提供正文"))+'</div>'
+    +'<div class="toolbar spaced">'+btn("分享脱敏记录","share-"+id)+'</div><h3 class="spaced">时间线</h3><ol class="timeline">'+r.steps.map(x=>'<li><strong>'+esc(tr(x.state))+'</strong>　'+esc(names[x.channel]||"")
+    +' <small>'+esc(when(x.at))+(x.attempt?' · 次数 '+x.attempt:"")+(x.reason?' · '+esc(tr(x.reason)):"")+'</small></li>').join("")
+    +'</ol><h3 class="spaced">渠道任务</h3>'+r.tasks.map(t=>'<div class="line"><span>'+esc(names[t.channel])+' · '+esc(t.held?"已暂缓":tr(t.state))
+    +(t.parts>1?'（'+t.part+'/'+t.parts+'）':"")+'<small>'+esc(tr(t.reason))
+    +(t.held?" · 功能、渠道或原目标已停用":t.state==="PENDING"&&t.next?' · 下次 '+esc(when(t.next)):"")+'</small></span>'
+    +(t.state==="FAILED"?btn("重试这条","retry-"+t.id):"")+'</div>').join("");
+  if(!$("#detail").open)$("#detail").showModal();
+  $("#detail").dataset.id=id;
+}
+function showExport(title,r) {
+  $("#detail-content").innerHTML='<div class="section-head"><h2 id="detail-title">'+title+'</h2>'+btn("关闭","close-detail")+'</div>'
+    +'<label class="field">选中文本后可复制分享<textarea id="share-text" rows="12" readonly></textarea></label>'
+    +(r.path?'<small>'+esc(r.path)+'</small>':"");
+  $("#share-text").value=r.text;
+  if(!$("#detail").open)$("#detail").showModal();
+}
+async function renderLogs(){
+  view.innerHTML='<section class="section"><div class="section-head"><h2>运行日志</h2>'+btn("导出脱敏诊断","export")+'</div><div class="toolbar">'
+    +box("仅告警和错误","warnings",true)+btn("刷新日志","log-refresh")+'</div><pre class="log spaced" id="log"></pre></section>';
+  await loadLogs();
+}
+async function loadLogs(){const r=await call({op:"logs",warnings:$("#warnings").checked});$("#log").textContent=r.text||"暂无日志。";}
+async function changePage(target){
+  page=target;document.querySelectorAll(".nav-tab").forEach(x=>x.setAttribute("aria-current",x.dataset.page===page?"page":"false"));
+  if(page==="overview")overview();
+  if(page==="rules")renderRules();
+  if(page==="history"){history();await loadHistory();}
+  if(page==="logs")await renderLogs();
+}
+async function load(){
+  status=await call({op:"status"});
+  settings=await call({op:"settings"});
+  renderHeader();
+  if(page==="overview")overview();
+  if(page==="rules")renderRules();
+}
+async function action(a){
+  if(a==="refresh"||a==="start"){if(a==="start")await call({op:"start"});await load();return;}
+  if(a==="listeners"){status=await call({op:"listeners"});overview();return;}
+  if(a.startsWith("toggle-")){
+    const k=a.slice(7),r=settings.routing[k];
+    const change={};for(const f of ["enabled","wecom","smtp"])change["routing."+k+"."+f]=f==="enabled"?!r.enabled:r[f];
+    await save(change);return;
+  }
+  if(a==="save"){await save(readChanges());return;}
+  if(a==="apps"){apps=(await call({op:"apps"})).apps;renderApps();return;}
+  if(a==="filter"){
+    for(const k of ["kind","state","channel","search"])filters[k]=$("#filter-"+k).value;
+    filters.from=$("#filter-since").value?new Date($("#filter-since").value+"T00:00:00").getTime():0;
+    await loadHistory();return;
+  }
+  if(a==="older"){await loadHistory(true);return;}
+  if(a.startsWith("detail-")){await showDetail(Number(a.slice(7)));return;}
+  if(a==="close-detail"){$("#detail").close();return;}
+  if(a.startsWith("retry-")){await call({op:"retry",id:Number(a.slice(6))});await showDetail(Number($("#detail").dataset.id));showMsg("已重新进入队列。");return;}
+  if(a==="log-refresh"){await loadLogs();return;}
+  if(a==="export"){showExport("脱敏诊断",await call({op:"export"}));return;}
+  if(a.startsWith("share-")){showExport("脱敏记录",await call({op:"share",id:Number(a.slice(6))}));return;}
+  if(a==="preview"||a==="test"){
+    const sample={op:a,kind:$("#sample-kind").value,source:$("#sample-source").value||"模拟号码",
+      slot:Number($("#sample-slot").value),pkg:$("#sample-pkg").value,category:$("#sample-category").value,
+      title:$("#sample-title").value,body:$("#sample-body").value};
+    if(a==="test"&&!confirm("测试会向当前规则选择的渠道发送一条模拟消息。继续？"))return;
+    const r=await call({...sample,confirmed:a==="test"});
+    const out=$("#preview-result");out.hidden=false;
+    out.textContent=(r.id?"已入队，记录 #"+r.id:tr(r.decision))+(r.channels.length?" · "+r.channels.map(k=>names[k]).join("、"):"")
+      +"\n\n"+r.title+"\n"+r.body;
+  }
+}
+async function guard(work){
+  if(busy)return;busy=true;
+  try{showMsg("");await work();}
+  catch(e){showMsg(e.message||"操作未完成。",true);if(!status&&page==="overview")overview();}
+  finally{busy=false;}
+}
+document.addEventListener("click",e=>{
+  const el=e.target.closest("button");if(!el)return;
+  if(el.id==="refresh"){guard(()=>action("refresh"));return;}
+  if(el.dataset.page){guard(()=>changePage(el.dataset.page));return;}
+  if(el.dataset.action)guard(()=>action(el.dataset.action));
+});
+document.addEventListener("change",e=>{
+  const pkg=e.target.dataset.app;if(!pkg||!draft)return;
+  const set=new Set(draft.routing.notification.apps||[]);
+  if(e.target.checked)set.add(pkg);else set.delete(pkg);
+  draft.routing.notification.apps=Array.from(set);
+});
+overview();guard(load);
+}());
+</script>
+</body>
+</html>

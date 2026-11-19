@@ -16,6 +16,16 @@ public final class RelayCore implements AutoCloseable {
   final Logger log;
   final Device device;
   final SmsSource source;
+  final EventSources events;
+  final WebPanel panel;
+  private final java.util.Map<String,String> activeNotifications =
+      new java.util.LinkedHashMap<String,String>(128,0.75f,true) {
+        @Override protected boolean removeEldestEntry(java.util.Map.Entry<String,String> eldest) {
+          return size() > 512;
+        }
+      };
+  private long notificationBaseline;
+  private final java.util.Map<String,Long> lastEvent = new java.util.HashMap<>();
   private final ExecutorService work = Executors.newSingleThreadExecutor();
   private final ConnectivityManager.NetworkCallback callback;
   private boolean injectedOffline;
@@ -29,7 +39,7 @@ public final class RelayCore implements AutoCloseable {
   private Process child;
   private PowerManager.WakeLock wake;
   public long sends;
-  private long nextWecom;
+  private long nextWecom, nextNotificationSmtp;
   private final Runnable pump = () -> dispatch();
 
   public RelayCore(File dir, Handler handler) throws Exception {
@@ -37,12 +47,24 @@ public final class RelayCore implements AutoCloseable {
     h = handler;
     cfg = loadEffective(dir);
     log = new Logger(home, cfg);
-    log.log("INFO", "starting smsrelay 0.1.0");
+    log.log("INFO", "starting smsrelay 0.2.0");
     db = new StateDb(home);
     db.cleanup(cfg);
     device = new Device(h);
     device.refreshSims();
-    device.watchSims(() -> log.log("INFO", "subscription_changed " + device.simStatus));
+    events = new EventSources(device, new EventSources.Sink() {
+      @Override public void ringing(int sub, String number) { onRing(sub,number); }
+      @Override public void posted(android.service.notification.StatusBarNotification sbn) {
+        onNotification(sbn);
+      }
+      @Override public void removed(android.service.notification.StatusBarNotification sbn) {
+        activeNotifications.remove(sbn.getKey());
+      }
+    });
+    device.watchSims(() -> {
+      log.log("INFO", "subscription_changed " + device.simStatus);
+      if (Routing.enabled(cfg,"call")) events.refreshCalls();
+    });
     log.log("INFO", "subscriptions " + device.simStatus);
     source = new SmsSource(h, db, device, log, cfg, () -> dispatch());
     callback =
@@ -62,7 +84,85 @@ public final class RelayCore implements AutoCloseable {
             h.post(pump);
           }
         };
+    panel = new WebPanel(this);
+    configureSources();
     h.post(pump);
+  }
+
+  void configureSources() {
+    boolean notify = Routing.enabled(cfg,"notification");
+    if (!notify || !events.notificationState.equals("ready")) {
+      notificationBaseline = System.currentTimeMillis();
+      activeNotifications.clear();
+    }
+    events.configure(Routing.enabled(cfg,"call"),notify);
+  }
+
+  private void onRing(int sub, String number) {
+    if (!Routing.enabled(cfg,"call")) return;
+    long now = System.currentTimeMillis();
+    String name = number != null && !number.isEmpty() ? number : "未知号码";
+    lastEvent.put("call",now);
+    capture(new Routing.Event("call","call:"+java.util.UUID.randomUUID(),name,
+        "来电提醒 · "+name,"","","",now,device.sim(sub).slot,false),null);
+  }
+
+  private void onNotification(android.service.notification.StatusBarNotification sbn) {
+    if (!Routing.enabled(cfg,"notification") || sbn == null || sbn.getPostTime() < notificationBaseline) return;
+    if (sbn.getUser() == null || !sbn.getUser().equals(android.os.Process.myUserHandle())) return;
+    String pkg = sbn.getPackageName();
+    try {
+      if (!Routing.selectedApp(cfg,pkg)) return;
+      android.app.Notification n = sbn.getNotification();
+      if (n == null) return;
+      lastEvent.put("notification",System.currentTimeMillis());
+      android.os.Bundle extras = n.extras;
+      String title = extra(extras, android.app.Notification.EXTRA_TITLE);
+      String body = extra(extras, android.app.Notification.EXTRA_BIG_TEXT);
+      if (body.isEmpty()) body = extra(extras, android.app.Notification.EXTRA_TEXT);
+      if (body.isEmpty() && extras != null) {
+        CharSequence[] lines = extras.getCharSequenceArray(android.app.Notification.EXTRA_TEXT_LINES);
+        if (lines != null) body = android.text.TextUtils.join("\n",lines);
+      }
+      String label = pkg;
+      try {
+        android.content.pm.PackageManager pm = device.context.getPackageManager();
+        label = pm.getApplicationLabel(pm.getApplicationInfo(pkg,0)).toString();
+      } catch (android.content.pm.PackageManager.NameNotFoundException ignored) {}
+      if (title == null) title = "";
+      boolean noisy = (n.flags & (android.app.Notification.FLAG_ONGOING_EVENT |
+          android.app.Notification.FLAG_GROUP_SUMMARY | android.app.Notification.FLAG_FOREGROUND_SERVICE)) != 0;
+      String signature = Rules.hash(title+"\u0000"+body);
+      boolean repeat = signature.equals(activeNotifications.put(sbn.getKey(),signature));
+      String category = android.os.Build.VERSION.SDK_INT >= 26 ? n.getChannelId() : n.category;
+      if (category == null) category = "";
+      String key = "notice:" + Rules.hash(sbn.getKey()+"|"+sbn.getPostTime()+"|"+signature);
+      Routing.Event event = new Routing.Event("notification",key,label,title,body,pkg,
+          category,sbn.getPostTime(),0,noisy);
+      // 重复刷新写入原时间线，不再复制正文或建立新任务。
+      if (repeat) { db.noteDuplicate(sbn.getKey()); return; }
+      long id = capture(event,null);
+      if (id > 0) db.rememberNotification(sbn.getKey(),id);
+    } catch (Exception e) { log.error("notification_read",e); }
+  }
+
+  private static String extra(android.os.Bundle extras, String key) {
+    CharSequence value = extras == null ? null : extras.getCharSequence(key);
+    return value == null ? "" : value.toString();
+  }
+
+  long capture(Routing.Event event, String reason) {
+    try {
+      long id;
+      db.begin();
+      try { id = db.addEvent(event,cfg,false,reason); db.commit(); }
+      finally { db.end(); }
+      dispatch();
+      return id;
+    } catch (Exception e) {
+      log.error("event_capture",e);
+      return 0;
+    }
   }
 
   static Config loadEffective(File home) throws Exception {
@@ -96,22 +196,43 @@ public final class RelayCore implements AutoCloseable {
     h.removeCallbacks(pump);
     StateDb.Task startedTask = null;
     try {
-      boolean pending = db.pending() > 0;
-      // 只有可发送的待办才需要监听网络状态，断网时等系统回调再继续。
-      watch(pending && cfg.enabled);
-      if (!pending || !cfg.enabled || busy) return;
-      if (!online()) return;
       long now = System.currentTimeMillis();
-      StateDb.Task task = db.due(now);
-      if (task == null) {
-        long next = db.next();
-        if (next >= 0) h.postDelayed(pump, Math.max(1, next - now));
+      db.expire(now);
+      long expiry = db.nextExpiry();
+      if (expiry>now) h.postDelayed(pump,expiry-now);
+      String allowed = db.allowed(cfg);
+      long next = db.next(allowed);
+      watch(next >= 0 || busy);
+      if (next < 0 || busy) return;
+      StateDb.Task candidate = db.due(now,allowed);
+      if (!online()) {
+        if (candidate != null) db.history.once(candidate,"waiting_network","network_unavailable");
         return;
       }
-      if (task.channel.equals("wecom") && now < nextWecom) {
-        h.postDelayed(pump, nextWecom - now);
+      String ready = "("+allowed+")";
+      if (now < nextWecom) {
+        StateDb.Task limited = db.due(now,ready+" AND t.channel='wecom'");
+        if (limited != null) {
+          db.history.once(limited,"throttled","wecom_interval");
+          h.postDelayed(pump,nextWecom-now);
+        }
+        ready += " AND t.channel!='wecom'";
+      }
+      if (now < nextNotificationSmtp) {
+        String group = "(t.channel='smtp' AND "+StateDb.kindSql()+"='notification')";
+        StateDb.Task limited = db.due(now,ready+" AND "+group);
+        if (limited != null) {
+          db.history.once(limited,"throttled","notification_interval");
+          h.postDelayed(pump,nextNotificationSmtp-now);
+        }
+        ready += " AND NOT "+group;
+      }
+      candidate = db.due(now,ready);
+      if (candidate == null) {
+        if (next > now) h.postDelayed(pump,next-now);
         return;
       }
+      final StateDb.Task task = candidate;
       Config snapshot = new Config(task.settings);
       if (task.attempt >= snapshot.retry.length + 1) {
         db.result(task, false, true, "interrupted_attempt_limit", cfg, now);
@@ -225,6 +346,7 @@ public final class RelayCore implements AutoCloseable {
                 + (SystemClock.elapsedRealtime() - start));
       }
       if (t.channel.equals("wecom")) nextWecom = System.currentTimeMillis() + 3100;
+      else if (t.kind.equals("notification")) nextNotificationSmtp = System.currentTimeMillis() + 1500;
       db.cleanup(cfg);
     } catch (Exception e) {
       log.error("queue_result", e);
@@ -246,15 +368,22 @@ public final class RelayCore implements AutoCloseable {
         .put("pid", android.os.Process.myPid())
         .put("instance", instance)
         .put("running", true)
-        .put("version", "0.1.0")
-        .put("enabled", cfg.enabled)
+        .put("version", "0.2.0")
+        .put("enabled", Routing.enabled(cfg,"sms"))
+        .put("health", new JSONObject()
+            .put("sms", health("sms",source.registered() ? "ready" : "disconnected"))
+            .put("call",health("call",events.callState)
+                .put("ready_subscriptions",events.readySubscriptions())
+                .put("watched_subscriptions",events.watchedSubscriptions()))
+            .put("notification",health("notification",events.notificationState)))
         .put("observer_registered", source.registered())
         .put("compatibility", source.branch())
-        .put("queue", db.status())
+        .put("queue", db.status().put("HELD",db.held(cfg)))
         .put("queries", source.queries())
         .put("callbacks", source.callbacks)
         .put("scans", source.scans)
         .put("sends", sends)
+        .put("online",online())
         .put("network_callback", watching)
         .put("active_work", busy)
         .put("wakelock", wake != null && wake.isHeld())
@@ -262,7 +391,25 @@ public final class RelayCore implements AutoCloseable {
         .put("log_write_failed", log.failed());
   }
 
+  private JSONObject health(String kind, String state) throws Exception {
+    long latest = lastEvent.containsKey(kind) ? lastEvent.get(kind) : db.lastCaptured(kind);
+    return new JSONObject().put("enabled",Routing.enabled(cfg,kind)).put("listener",state)
+        .put("last_event",latest);
+  }
+
+  void apply(Config next) throws Exception {
+    source.scan();
+    Logger.atomic(new File(home,"config.active.json"),next.raw.toString());
+    cfg=next;
+    source.configure(next);
+    log.configure(next);
+    configureSources();
+    log.log("INFO","configuration_reloaded");
+    dispatch();
+  }
+
   public String command(String command) throws Exception {
+    if (command.startsWith("web ")) return panel.request(command.substring(4));
     if (command.equals("test-offline") || command.equals("test-online")) {
       if (!home.getName().startsWith("smsrelay-test-"))
         throw new SecurityException("isolated service only");
@@ -279,14 +426,7 @@ public final class RelayCore implements AutoCloseable {
         return "config_valid";
       case "reload":
         {
-          Config next = Config.load(home);
-          source.scan();
-          Logger.atomic(new File(home, "config.active.json"), next.raw.toString());
-          cfg = next;
-          source.configure(next);
-          log.configure(next);
-          log.log("INFO", "configuration_reloaded");
-          dispatch();
+          apply(Config.load(home));
           return "config_applied";
         }
       case "retry":
@@ -304,14 +444,8 @@ public final class RelayCore implements AutoCloseable {
             throw new SecurityException("isolated service only");
           if (!both && !raw.getJSONObject(wecom ? "wecom" : "smtp").getBoolean("enabled"))
             throw new IllegalStateException("channel disabled");
-          raw.put("enabled", true);
+          raw.put("enabled", false);
           if (!both) raw.getJSONObject(wecom ? "smtp" : "wecom").put("enabled", false);
-          raw.put(
-              "filters",
-              new JSONObject()
-                  .put("sim_slots", new JSONArray())
-                  .put("numbers", new JSONArray())
-                  .put("keywords", new JSONArray()));
           StateDb.Sms sms = new StateDb.Sms();
           sms.providerId = -1;
           sms.date = System.currentTimeMillis();
@@ -325,7 +459,7 @@ public final class RelayCore implements AutoCloseable {
                   + " 渠道连通性测试";
           db.begin();
           try {
-            db.add(sms, new Config(raw.toString()), false);
+            db.addChannelTest(sms, new Config(raw.toString()));
             db.commit();
           } finally {
             db.end();
@@ -368,6 +502,7 @@ public final class RelayCore implements AutoCloseable {
     if (wake != null && wake.isHeld()) wake.release();
     work.shutdownNow();
     watch(false);
+    events.close();
     source.close();
     device.close();
     log.log("INFO", "stopped");

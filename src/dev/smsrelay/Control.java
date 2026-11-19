@@ -23,7 +23,7 @@ public final class Control implements Closeable {
                 try (LocalSocket s = server.accept()) {
                   s.setSoTimeout(5000);
                   if (s.getPeerCredentials().getUid() != 0) continue;
-                  String cmd = boundedLine(s.getInputStream(), 128);
+                  String cmd = boundedLine(s.getInputStream(), 49160);
                   if (cmd == null) continue;
                   FutureTask<String> task =
                       new FutureTask<>(
@@ -72,7 +72,7 @@ public final class Control implements Closeable {
       int n;
       while ((n = s.getInputStream().read(x)) != -1) {
         b.write(x, 0, n);
-        if (b.size() > 131072) throw new IOException("response too large");
+        if (b.size() > 1048576) throw new IOException("response too large");
       }
       return b.toString("UTF-8").trim();
     }

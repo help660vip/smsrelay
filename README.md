@@ -4,7 +4,7 @@
 
 smsrelay 是一个纯 Magisk 模块。可以任选企业微信机器人、SMTP 邮箱，或同时发送到两个渠道。适合把备用机、双卡手机上的来信集中到常用的群或邮箱。
 
-[下载模块](https://github.com/help660vip/smsrelay/releases/latest) · [配置手册](docs/USAGE.md) · [兼容性](docs/COMPATIBILITY.md) · [反馈问题](https://github.com/help660vip/smsrelay/issues/new)
+[下载正式版](https://github.com/help660vip/smsrelay/releases/latest) · [新版 WebUI](docs/WEBUI.md) · [配置手册](docs/USAGE.md) · [兼容性](docs/COMPATIBILITY.md) · [反馈问题](https://github.com/help660vip/smsrelay/issues/new)
 
 ## 能做什么
 
@@ -19,7 +19,7 @@ smsrelay 是一个纯 Magisk 模块。可以任选企业微信机器人、SMTP �
 
 1. **下载 ZIP。** 打开 [最新 GitHub Release](https://github.com/help660vip/smsrelay/releases/latest)，在 **Assets** 下载 `smsrelay-*.zip`。同一页面提供 `.zip.sha256` 校验文件。
 2. **安装并重启。** 打开 Magisk → 模块 → 从本地安装，选中下载的 `smsrelay-*.zip`，直接安装后重启。
-3. **填写配置。** 用支持 root 的文件管理器打开 `/data/adb/smsrelay/config.json`。把顶层 `enabled` 设为 `true`，再打开所需渠道并填写下表中的字段。首次安装默认关闭转发，首次启用会跳过历史短信。
+3. **填写配置。** 用支持 root 的文件管理器打开 `/data/adb/smsrelay/config.json`。v0.1.0 把顶层 `enabled` 设为 `true`。使用带有 `routing` 的 v0.2.0 配置时，在 WebUI 打开短信，或将 `routing.sms.enabled` 设为 `true`。再打开所需渠道并填写下表中的字段。首次安装默认关闭转发，首次启用会跳过历史短信。
 4. **保存并测试。** 回到 Magisk → 模块 → smsrelay →「操作」，用音量上键切换、音量下键确认，执行「检查并重载配置」。选择对应渠道的固定测试消息，再检查群里或收件箱是否收到。
 
 | 转发到 | 要填的配置 |
@@ -28,6 +28,10 @@ smsrelay 是一个纯 Magisk 模块。可以任选企业微信机器人、SMTP �
 | 邮箱 | 开启 `smtp.enabled`，填写 `host`、`port`、`tls`、`username`、`password`、`from` 和收件人列表 `to` |
 
 [带中文注释的配置模板](module/config/config.json)和[渠道示例](docs/USAGE.md#渠道设置)可以直接对照填写。文件保留 `config.json` 名称，支持 `//` 注释。三个筛选列表均为空时，会转发所有新收件短信。
+
+## WebUI 与更多转发类型
+
+v0.2.0 开发版新增响铃提醒和应用通知。短信、来电和应用通知可以分别开关，并各选企业微信、邮箱或两个渠道。在 Magisk 手机上，用 KsuWebUIStandalone 打开 `smsrelay`，可以选应用、预览规则、检查监听和查看收发记录。有了 WebUI 仍可继续用 Magisk「操作」菜单。[新版上手与兼容限制](docs/WEBUI.md)
 
 ## 日常使用
 

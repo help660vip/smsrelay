@@ -4,8 +4,21 @@
   // 改完后在 Magisk「操作」里选「检查并重载配置」。
   "schema_version": 1,
 
-  // 总开关。配置好至少一个渠道后，将 false 改成 true。
+  // v0.1.0 旧短信开关。使用下方 routing 时，请改对应功能的 enabled。
   "enabled": false,
+
+  // 三项功能各自启用、选择渠道。旧配置没有 routing 时沿用原短信开关。
+  "routing": {
+    "sms": {"enabled": false, "wecom": true, "smtp": true},
+    "call": {"enabled": false, "wecom": false, "smtp": true},
+    "notification": {
+      "enabled": false,
+      "wecom": false,
+      "smtp": true,
+      "apps": [],
+      "exclude_channels": []
+    }
+  },
 
   // 短信筛选。每组命中任意一项即可，启用多组时需同时满足。
   // 空列表 [] 表示不限该项。三组留空会转发所有新收件短信。
@@ -60,6 +73,7 @@
 
   // 手机本地队列和去重记录的保留设置。
   "retention": {
+    "history_days": 7,         // 已处理的完整事件历史保留天数。
     "dedup_days": 30,           // 去重记录保留天数。
     "max_messages": 20000,      // 消息记录数上限，达到后需处理积压。
     "completed_body_hours": 24 // 所有目标发送成功后，正文的保留小时数。

@@ -59,6 +59,23 @@ public final class Main {
         }
         return;
       }
+      if (mode.equals("web")) {
+        String token = Control.boundedLine(System.in,49152);
+        try {
+          org.json.JSONObject request = WebPanel.decode(token == null ? "" : token);
+          if ("start".equals(request.optString("op"))) start(home);
+          String reply;
+          try { reply = Control.request(home,"web "+token); }
+          catch (IOException offline) {
+            if ("start".equals(request.optString("op"))) {
+              reply = await(home);
+              if (!reply.startsWith("{")) reply = WebPanel.error("service_offline").toString();
+            } else reply = WebPanel.error("service_offline").toString();
+          }
+          System.out.println(reply);
+        } catch (Exception bad) { System.out.println(WebPanel.error("bad_request")); }
+        return;
+      }
       if (mode.equals("menu")) {
         Menu.run(home);
         return;

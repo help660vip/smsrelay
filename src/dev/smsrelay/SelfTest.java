@@ -327,7 +327,64 @@ public final class SelfTest {
       }
       source.close();
     }
+    routingAndHistory(home,cfg);
     System.out.println(
         "SELFTEST_OK checks=" + checks + " no_network=true no_system_SMS_mutation=true");
+  }
+
+  private static void routingAndHistory(File home, Config original) throws Exception {
+    long now = System.currentTimeMillis();
+    File isolated = new File(home,"routing");
+    isolated.mkdirs();
+    JSONObject raw = new JSONObject(original.raw.toString());
+    JSONObject rules = Routing.defaults(original);
+    rules.getJSONObject("notification").put("enabled",true).put("wecom",true)
+        .put("smtp",true).put("apps",new JSONArray().put("com.example.good"));
+    rules.getJSONObject("call").put("enabled",true).put("wecom",false).put("smtp",true);
+    Config cfg = new Config(raw.put("routing",rules).toString());
+    try (StateDb db = new StateDb(isolated)) {
+      Routing.Event app = new Routing.Event("notification","notice1","合成应用","合成标题",
+          "包含完整正文\n第二行","com.example.good","message",now,0,false);
+      Routing.Event second = new Routing.Event("notification","notice2","合成应用","合成标题",
+          app.body,app.pkg,app.category,now+1,0,false);
+      Routing.Event other = new Routing.Event("notification","noticeX","其他应用","合成标题",
+          app.body,"com.example.other","message",now,0,false);
+      Routing.Event loop = new Routing.Event("notification","noticeY","合成应用","系统消息",
+          db.marker+"\n已转发过的内容",app.pkg,app.category,now,0,false);
+      Routing.Event call = new Routing.Event("call","call1","未知号码","来电测试",
+          "","", "",now,2,false);
+      check(Routing.effect(cfg,other,db.marker).equals("app_not_selected"),"unselected application is rejected");
+      check(Routing.effect(cfg,loop,db.marker).equals("loop_prevented"),"same relay marker blocks either channel");
+      long id;
+      db.begin();
+      try {
+        id=db.addEvent(app,cfg,true,null);
+        db.addEvent(second,cfg,true,null);
+        db.addEvent(loop,cfg,true,null);
+        db.addEvent(call,cfg,true,null);
+        db.commit();
+      } finally { db.end(); }
+      check(db.pending()==5,"equal text with different event IDs is not discarded");
+      check(db.due(now,db.allowed(cfg)).kind.equals("call"),"ring alert precedes ordinary notices");
+      db.expire(now+600001);
+      check(db.pending()==4,"stale ring alert expires without sending");
+      JSONObject entry=db.history.detail(id,db.allowed(cfg));
+      check(entry.getString("body").equals(app.body) && entry.getJSONArray("tasks").length()==2,
+          "history preserves notice content and independent channel tasks");
+      StateDb.Task t=db.due(now+2,db.allowed(cfg));
+      db.sending(t);
+      db.result(t,true,false,"server_accepted",cfg,now+3);
+      check(db.history.detail(id,db.allowed(cfg)).getJSONArray("steps").length()>=4,
+          "send attempt and acceptance appear on detail timeline");
+      JSONObject changed = new JSONObject(cfg.raw.toString());
+      changed.getJSONObject("smtp").put("to",new JSONArray().put("another@example.invalid"));
+      check(db.held(new Config(changed.toString()))==2,"old destination is held when recipient changes");
+    }
+    String jsonc="{\n  // keep this\n  \"smtp\": {\"password\": \"first\"} // keep this too\n}\n";
+    String changed=JsonEdits.set(jsonc,"smtp.password","embedded \" quotes // text");
+    changed=JsonEdits.set(changed,"routing.sms.enabled",true);
+    check(changed.contains("// keep this") && changed.contains("// keep this too")
+        && new JSONObject(changed).getJSONObject("smtp").getString("password").equals("embedded \" quotes // text"),
+        "form changes preserve unrelated JSON comments and escape values");
   }
 }

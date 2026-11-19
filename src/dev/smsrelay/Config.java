@@ -70,8 +70,9 @@ public final class Config {
         addr.validate();
       }
     }
-    if (enabled && !wecom.getBoolean("enabled") && !smtp.getBoolean("enabled"))
+    if (!raw.has("routing") && enabled && !wecom.getBoolean("enabled") && !smtp.getBoolean("enabled"))
       throw new IllegalArgumentException("no enabled channel");
+    Routing.validate(this);
     if (!Arrays.asList("DEBUG", "INFO", "WARN", "ERROR").contains(logging.getString("level")))
       throw new IllegalArgumentException("logging.level");
     if (!Arrays.asList(TimeZone.getAvailableIDs()).contains(logging.getString("timezone")))

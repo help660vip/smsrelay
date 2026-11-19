@@ -39,7 +39,7 @@ $version=((Get-Content "$root\module\module.prop" | Where-Object {$_ -match '^ve
 $output="$root\dist\smsrelay-$version.zip"
 $stream=[IO.File]::Open($output,[IO.FileMode]::Create);$zip=[IO.Compression.ZipArchive]::new($stream,[IO.Compression.ZipArchiveMode]::Create)
 try{
- $whitelist=@('module.prop','service.sh','action.sh','smsrelay','uninstall.sh','customize.sh','skip_mount','config/config.json')
+ $whitelist=@('module.prop','service.sh','action.sh','smsrelay','uninstall.sh','customize.sh','skip_mount','config/config.json','webctl','webroot/index.html')
  foreach($name in $whitelist){$path=Join-Path "$root\module" $name;if($name -eq 'skip_mount'){Add-ZipBytes $zip $name ([byte[]]@())}else{$text=[IO.File]::ReadAllText($path).Replace("`r",'');Add-ZipBytes $zip $name ([Text.Encoding]::UTF8.GetBytes($text))}}
  Add-ZipBytes $zip 'smsrelay.jar' ([IO.File]::ReadAllBytes($jar))
  foreach($name in @('LICENSE','THIRD_PARTY_NOTICES.md')){Add-ZipBytes $zip $name ([IO.File]::ReadAllBytes("$root\$name"))}
